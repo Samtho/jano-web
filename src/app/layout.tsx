@@ -17,9 +17,18 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://samtho.github.io/jano-web/"),
   title: "Jano · Tu CV, adaptado a cada oferta. Sin inventar nada.",
   description:
     "Jano convierte tu CV en una base de hechos auditable, calcula el match real con cada oferta y redacta un CV adaptado donde cada bullet es trazable a su origen.",
+  icons: { icon: "/jano-web/favicon.svg" },
+  openGraph: {
+    title: "Jano · Tu CV, adaptado a cada oferta. Sin inventar nada.",
+    description:
+      "Match honesto con embeddings, ciclo de huecos que hace crecer tu base de hechos y CV adaptado con trazabilidad por bullet.",
+    type: "website",
+    locale: "es_ES",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
