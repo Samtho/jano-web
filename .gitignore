@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+*.log
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# Generado por scripts/copy-pdf-worker.mjs en predev/prebuild
+public/pdf.worker.min.mjs
