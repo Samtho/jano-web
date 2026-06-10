@@ -1,18 +1,19 @@
 import type { CvAdaptado, MatchResult, Postulacion } from "@/lib/types";
 
-// Unico punto de contacto con el motor n8n. Los paths v2 son exclusivos de
-// jano-web: los flujos v1 del PoC no se tocan.
+// Unico punto de contacto con el motor n8n. Apuntado al workflow UNICO
+// "Jano - Todo en uno" (paths mono-*). Para volver a los flujos separados v2,
+// cambiar el prefijo mono- por v2- en todos los paths de abajo.
 const BASE = "https://samtho.app.n8n.cloud/webhook";
 
 const PATHS = {
-  ingestCv: "/v2-ingest-cv",
-  matchOferta: "/v2-match-oferta",
-  guardarHueco: "/v2-guardar-hueco",
-  cvAdaptado: "/v2-cv-adaptado",
-  ofertaDesdeUrl: "/v2-oferta-url",
-  mejorarBullet: "/v2-mejorar-bullet",
-  postulaciones: "/v2-postulaciones",
-  postulacionesAlta: "/v2-postulaciones-alta",
+  ingestCv: "/mono-ingest-cv",
+  matchOferta: "/mono-match-oferta",
+  guardarHueco: "/mono-guardar-hueco",
+  cvAdaptado: "/mono-cv-adaptado",
+  ofertaDesdeUrl: "/mono-oferta-url",
+  mejorarBullet: "/mono-mejorar-bullet",
+  postulaciones: "/mono-postulaciones",
+  postulacionesAlta: "/mono-postulaciones-alta",
 } as const;
 
 // POST con un reintento automatico ante fallo de red o 5xx (a prueba de demo).
@@ -78,7 +79,7 @@ export async function getPostulaciones(): Promise<Postulacion[]> {
 }
 
 export function updatePostulacion(p: { id: string; estado?: string; sector?: string; salario?: string }) {
-  return post<{ ok: boolean }>("/v2-postulaciones-update", p);
+  return post<{ ok: boolean }>("/mono-postulaciones-update", p);
 }
 
 export function addPostulacion(p: {
