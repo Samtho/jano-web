@@ -6,8 +6,9 @@ import Pill from "@/components/ui/Pill";
 import ProcessLoader from "@/components/ui/ProcessLoader";
 import { useToast } from "@/components/ui/Toast";
 import { addPostulacion, mejorarBullet } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { getCvId } from "@/lib/session";
-import type { BulletCv, CvAdaptado } from "@/lib/types";
+import type { BulletCv, ContactoCv, CvAdaptado } from "@/lib/types";
 import type { OfertaMeta } from "./Wizard";
 
 type Props = {
@@ -22,19 +23,24 @@ type Props = {
 const STAGES_CV = [
   "Leyendo todos tus hechos con origen",
   "Seleccionando los más relevantes para la oferta",
-  "Redactando cada bullet (solo con tus hechos)",
+  "Redactando en formato Harvard (solo con tus hechos)",
   "Citando el origen de cada línea",
 ];
 
-type Sel = { s: number; b: number } | null;
+// Orden Harvard: perfil (aparte), habilidades, experiencia, educacion, certs.
+const ORDEN: Record<string, number> = { habilidades: 1, experiencia: 2, educacion: 3, certificaciones: 4, otros: 5 };
+
+type Sel = { si: number; bi: number; bu: number } | { perfil: true } | null;
 
 export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto, ofertaMeta, onVolver }: Props) {
   const toast = useToast();
-  // Copia editable del CV (para reemplazar bullets con las alternativas de la IA).
-  const [secciones, setSecciones] = useState(adaptado?.secciones ?? []);
+  const { user } = useAuth();
+
+  const [cv, setCv] = useState<CvAdaptado | null>(adaptado);
   const [sel, setSel] = useState<Sel>(null);
   const [alternativas, setAlternativas] = useState<string[] | null>(null);
   const [mejorando, setMejorando] = useState(false);
+  const [descargando, setDescargando] = useState(false);
 
   const [empresa, setEmpresa] = useState("");
   const [puesto, setPuesto] = useState("");
@@ -43,19 +49,29 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
   const [guardandoTracker, setGuardandoTracker] = useState(false);
   const [trackerOk, setTrackerOk] = useState(false);
 
-  // Sincronizar cuando llega el CV generado + autorellenar empresa/puesto desde la oferta.
   useEffect(() => {
-    if (adaptado) setSecciones(adaptado.secciones);
+    if (adaptado) setCv(adaptado);
   }, [adaptado]);
   useEffect(() => {
     if (ofertaMeta.empresa) setEmpresa((v) => v || ofertaMeta.empresa);
     if (ofertaMeta.titulo) setPuesto((v) => v || ofertaMeta.titulo);
   }, [ofertaMeta]);
 
-  const bulletSel: BulletCv | null = sel ? secciones[sel.s]?.bullets[sel.b] ?? null : null;
+  const contacto: ContactoCv = {
+    nombre: (user?.user_metadata?.nombre as string) || user?.email?.split("@")[0] || "Tu nombre",
+    email: user?.email ?? undefined,
+  };
 
-  function seleccionar(s: number, b: number) {
-    setSel({ s, b });
+  const bulletSel: BulletCv | null =
+    sel && "si" in sel ? cv?.secciones[sel.si]?.bloques?.[sel.bi]?.bullets?.[sel.bu] ?? null : null;
+  const origenSel: string[] = sel
+    ? "perfil" in sel
+      ? cv?.perfil_origen ?? []
+      : bulletSel?.origen ?? []
+    : [];
+
+  function seleccionarBullet(si: number, bi: number, bu: number) {
+    setSel({ si, bi, bu });
     setAlternativas(null);
   }
 
@@ -64,7 +80,7 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
     setMejorando(true);
     setAlternativas(null);
     try {
-      const r = await mejorarBullet(bulletSel.texto, bulletSel.origen, ofertaTexto);
+      const r = await mejorarBullet(bulletSel.texto, bulletSel.origen.join(" | "), ofertaTexto);
       if (!r.alternativas?.length) throw new Error("sin alternativas");
       setAlternativas(r.alternativas);
     } catch {
@@ -75,19 +91,39 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
   }
 
   function aplicarAlternativa(texto: string) {
-    if (!sel) return;
-    setSecciones((prev) =>
-      prev.map((s, si) =>
-        si !== sel.s
+    if (!sel || !("si" in sel) || !cv) return;
+    setCv({
+      ...cv,
+      secciones: cv.secciones.map((s, si) =>
+        si !== sel.si
           ? s
           : {
               ...s,
-              bullets: s.bullets.map((b, bi) => (bi !== sel.b ? b : { ...b, texto })),
+              bloques: s.bloques?.map((b, bi) =>
+                bi !== sel.bi
+                  ? b
+                  : { ...b, bullets: b.bullets?.map((bu, bui) => (bui !== sel.bu ? bu : { ...bu, texto })) }
+              ),
             }
-      )
-    );
+      ),
+    });
     setAlternativas(null);
     toast("Bullet actualizado. El origen se mantiene.", "ok");
+  }
+
+  async function descargarPdf() {
+    if (!cv) return;
+    setDescargando(true);
+    try {
+      // Import dinamico: el generador de PDF solo se carga al pulsar el boton.
+      const { descargarCvPdf } = await import("@/lib/cvPdf");
+      await descargarCvPdf(cv, contacto, ofertaMeta.empresa || empresa);
+      toast("PDF descargado.", "ok");
+    } catch (e) {
+      toast(`No pude generar el PDF: ${e instanceof Error ? e.message : "error"}`, "error");
+    } finally {
+      setDescargando(false);
+    }
   }
 
   async function guardarEnTracker() {
@@ -106,7 +142,7 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
         cv_id: getCvId(),
       });
       setTrackerOk(true);
-      toast("Postulación registrada en tu tracker. Cero doble entrada.", "ok");
+      toast("Postulación registrada en tu tracker.", "ok");
     } catch {
       toast("No pude registrar la postulación. Reintenta.", "error");
     } finally {
@@ -114,19 +150,20 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
     }
   }
 
-  if (busy || !secciones.length) {
+  if (busy || !cv) {
     return (
       <div className="py-10">
         <h1 className="mb-2 text-center font-display text-3xl font-semibold tracking-tight">
-          Redactando tu CV <em className="text-accent">adaptado</em>…
+          Redactando tu CV <em className="text-accent">Harvard</em>…
         </h1>
-        <p className="mb-8 text-center text-sm text-muted-2">
-          Nada se inventa: cada bullet citará su origen.
-        </p>
+        <p className="mb-8 text-center text-sm text-muted-2">Nada se inventa: cada línea citará su origen.</p>
         <ProcessLoader stages={STAGES_CV} stepMs={2000} />
       </div>
     );
   }
+
+  const secciones = [...cv.secciones].sort((a, b) => (ORDEN[a.tipo] ?? 9) - (ORDEN[b.tipo] ?? 9));
+  const lineaContacto = [contacto.email].filter(Boolean).join("  ●  ");
 
   return (
     <div>
@@ -136,61 +173,112 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
             CV <em className="text-accent">adaptado</em>.
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-2">
-            Haz clic en un bullet para auditar su origen o pedirle a la IA otras redacciones (sin
-            salirse del hecho).
+            Formato Harvard. Haz clic en una línea para auditar su origen o pedir otras redacciones.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onVolver}>
             ← Volver al match
           </Button>
-          <Button variant="ghost" onClick={() => window.print()}>
-            Imprimir / PDF
+          <Button onClick={descargarPdf} disabled={descargando} arrow>
+            {descargando ? "Generando…" : "Descargar PDF"}
           </Button>
         </div>
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        {/* Hoja del CV: papel real sobre el tema oscuro */}
-        <div className="print-area cv-paper rounded-2xl p-8">
-          {secciones.map((s, si) => (
-            <section key={s.titulo} className="mb-6 last:mb-0">
-              <h2 className="border-b pb-1.5 font-display text-lg font-semibold uppercase tracking-wide">
-                {s.titulo}
-              </h2>
-              <ul className="mt-3 space-y-2">
-                {s.bullets.map((b, bi) => {
-                  const activo = sel?.s === si && sel?.b === bi;
-                  return (
-                    <li key={bi}>
-                      <button
-                        onClick={() => seleccionar(si, bi)}
-                        className={`w-full rounded-lg px-3 py-1.5 text-left text-sm leading-relaxed transition ${activo ? "sel" : ""}`}
-                      >
-                        {b.texto}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+        {/* Hoja Harvard (clon de la plantilla) */}
+        <div className="cv-paper rounded-xl px-10 py-9 text-[13px] leading-[1.45] text-[#111]">
+          <p className="text-center font-display text-[26px] font-bold leading-tight">{contacto.nombre}</p>
+          {lineaContacto && <p className="mt-1 text-center text-[12px]">{lineaContacto}</p>}
+          <div className="mb-4 mt-3 border-b-2 border-black" />
+
+          {/* Perfil (clicable) */}
+          <button
+            onClick={() => {
+              setSel({ perfil: true });
+              setAlternativas(null);
+            }}
+            className={`w-full rounded px-1 py-0.5 text-left text-[13px] leading-relaxed ${
+              sel && "perfil" in sel ? "sel" : ""
+            }`}
+          >
+            {cv.perfil}
+          </button>
+
+          {secciones.map((sec, siOriginal) => {
+            const si = cv.secciones.indexOf(sec);
+            return (
+              <section key={`${sec.tipo}-${siOriginal}`} className="mt-4">
+                <p className="text-center text-[13px] font-bold uppercase tracking-wide">{sec.titulo}</p>
+
+                {sec.grupos?.map((g) => (
+                  <div key={g.categoria} className="mt-2 text-center">
+                    <p className="text-[13px] font-bold">{g.categoria}</p>
+                    <p className="text-[13px]">{g.items.join(", ")}</p>
+                  </div>
+                ))}
+
+                {sec.bloques?.map((b, bi) => (
+                  <div key={bi} className="mt-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-[13px] uppercase">{b.empresa}</p>
+                      <p className="text-[13px]">{b.ubicacion}</p>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-[13px] font-bold">{b.puesto}</p>
+                      <p className="text-[13px]">{b.fechas}</p>
+                    </div>
+                    {b.bullets && b.bullets.length > 0 && (
+                      <ul className="mt-1 list-disc space-y-1 pl-6">
+                        {b.bullets.map((bu, bui) => {
+                          const activo = sel && "si" in sel && sel.si === si && sel.bi === bi && sel.bu === bui;
+                          return (
+                            <li key={bui}>
+                              <button
+                                onClick={() => seleccionarBullet(si, bi, bui)}
+                                className={`w-full rounded px-1 py-0.5 text-left text-[13px] leading-snug ${activo ? "sel" : ""}`}
+                              >
+                                {bu.texto}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </section>
+            );
+          })}
         </div>
 
-        {/* Panel: trazabilidad + IA + tracker */}
+        {/* Panel: auditar + mejorar + tracker */}
         <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <div className="rounded-2xl border border-line bg-surface p-6 shadow-card">
             <h3 className="font-display text-lg font-semibold">Auditar y mejorar</h3>
             <p className="mt-1 text-xs text-muted">Clic en cualquier línea del CV.</p>
-            {bulletSel ? (
+            {sel ? (
               <div className="mt-4 space-y-3">
                 <div className="rounded-xl border border-accent/20 bg-tint p-4">
-                  <Pill tone="accent">Origen verificado</Pill>
-                  <p className="mt-3 text-sm font-medium leading-relaxed">&ldquo;{bulletSel.origen}&rdquo;</p>
+                  <Pill tone="accent">{origenSel.length > 1 ? `${origenSel.length} hechos de origen` : "Origen verificado"}</Pill>
+                  <div className="mt-3 space-y-2">
+                    {origenSel.length ? (
+                      origenSel.map((o, i) => (
+                        <p key={i} className="text-sm font-medium leading-relaxed">
+                          &ldquo;{o}&rdquo;
+                        </p>
+                      ))
+                    ) : (
+                      <p className="text-xs italic text-muted">Esta línea no declaró evidencia específica.</p>
+                    )}
+                  </div>
                 </div>
-                <Button variant="mini" onClick={pedirAlternativas} disabled={mejorando}>
-                  {mejorando ? "Pensando alternativas…" : "✦ Proponer otras redacciones"}
-                </Button>
+                {bulletSel && (
+                  <Button variant="mini" onClick={pedirAlternativas} disabled={mejorando}>
+                    {mejorando ? "Pensando alternativas…" : "✦ Proponer otras redacciones"}
+                  </Button>
+                )}
                 {mejorando && (
                   <div className="space-y-2" aria-live="polite">
                     <div className="skeleton h-9 w-full" />
@@ -213,16 +301,12 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
                         {a}
                       </button>
                     ))}
-                    <p className="text-[11px] leading-relaxed text-muted">
-                      Guardarraíl activo: las alternativas solo pueden afirmar lo que respalda el
-                      hecho de origen.
-                    </p>
                   </div>
                 )}
               </div>
             ) : (
               <div className="mt-4 rounded-xl border border-dashed border-line p-4 text-center text-xs italic text-muted">
-                Aún no has seleccionado ningún bullet.
+                Aún no has seleccionado ninguna línea.
               </div>
             )}
           </div>
@@ -243,35 +327,11 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
               </div>
             ) : (
               <div className="mt-4 space-y-2">
-                <input
-                  value={empresa}
-                  onChange={(e) => setEmpresa(e.target.value)}
-                  placeholder="Empresa"
-                  aria-label="Empresa"
-                  className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50"
-                />
-                <input
-                  value={puesto}
-                  onChange={(e) => setPuesto(e.target.value)}
-                  placeholder="Puesto"
-                  aria-label="Puesto"
-                  className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50"
-                />
+                <input value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Empresa" aria-label="Empresa" className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50" />
+                <input value={puesto} onChange={(e) => setPuesto(e.target.value)} placeholder="Puesto" aria-label="Puesto" className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50" />
                 <div className="flex gap-2">
-                  <input
-                    value={sector}
-                    onChange={(e) => setSector(e.target.value)}
-                    placeholder="Sector (opcional)"
-                    aria-label="Sector"
-                    className="w-1/2 rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50"
-                  />
-                  <input
-                    value={salario}
-                    onChange={(e) => setSalario(e.target.value)}
-                    placeholder="Salario (opcional)"
-                    aria-label="Salario"
-                    className="w-1/2 rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50"
-                  />
+                  <input value={sector} onChange={(e) => setSector(e.target.value)} placeholder="Sector (opcional)" aria-label="Sector" className="w-1/2 rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50" />
+                  <input value={salario} onChange={(e) => setSalario(e.target.value)} placeholder="Salario (opcional)" aria-label="Salario" className="w-1/2 rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50" />
                 </div>
                 <Button onClick={guardarEnTracker} disabled={guardandoTracker} arrow>
                   {guardandoTracker ? "Registrando…" : "Marcar como enviada"}

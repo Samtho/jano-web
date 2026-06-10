@@ -14,18 +14,46 @@ export interface MatchResult {
   noCubre: string[];
 }
 
+// ===== CV Harvard (lo que devuelve mono-cv-adaptado) =====
 export interface BulletCv {
   texto: string;
-  origen: string;
+  origen: string[]; // hechos literales que respaldan el bullet
+}
+
+export interface BloqueCv {
+  empresa?: string;
+  puesto?: string;
+  ubicacion?: string;
+  fechas?: string;
+  bullets?: BulletCv[];
+}
+
+export interface GrupoHabilidades {
+  categoria: string;
+  items: string[];
 }
 
 export interface SeccionCv {
+  tipo: "experiencia" | "habilidades" | "educacion" | "certificaciones" | "otros";
   titulo: string;
-  bullets: BulletCv[];
+  bloques?: BloqueCv[];
+  grupos?: GrupoHabilidades[];
+  bullets?: BulletCv[];
 }
 
 export interface CvAdaptado {
+  perfil: string;
+  perfil_origen: string[];
   secciones: SeccionCv[];
+}
+
+// Datos de cabecera del CV (no pasan por la IA: vienen de tu cuenta).
+export interface ContactoCv {
+  nombre: string;
+  email?: string;
+  ciudad?: string;
+  telefono?: string;
+  linkedin?: string;
 }
 
 export type EstadoPostulacion = "enviada" | "entrevista" | "oferta" | "rechazo" | "sin_respuesta";
