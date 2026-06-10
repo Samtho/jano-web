@@ -54,10 +54,18 @@ npm run build    # export estatico a ./out
 
 El deploy es automático: cada push a `main` publica en GitHub Pages.
 
-## Límites conocidos (v2)
+## Novedades 2.1
+
+- **Editor de bullets con IA**: en el CV adaptado, cada bullet puede pedir 3 redacciones alternativas (guardarraíl: solo lo que respalda el hecho de origen) y aplicarlas con un clic.
+- **Ofertas por URL con plan B**: si el sitio bloquea (LinkedIn), se reintenta automáticamente vía proxy de lectura; además se extraen título y empresa para autorellenar el tracker.
+- **CV adaptado pre-generado** en segundo plano al terminar el match: el paso 5 abre casi al instante.
+- **Cargas narradas** por etapas reales, confetti al lograr o subir el score, transiciones entre pasos, landing con aurora y demo de producto.
+- Reintento automático ante fallos de red en todas las llamadas.
+
+## Límites conocidos (v2.1)
 
 - Sin OCR: un PDF escaneado pide pegar el texto a mano.
-- LinkedIn bloquea la lectura anónima de ofertas por URL (fallback: pegar el texto).
+- Si ni el fetch directo ni el proxy de lectura pueden leer una URL, se pega el texto a mano.
 - Identidad por navegador, sin login.
 - La exportación .docx ATS pertenece a la capa C del equipo; aquí hay imprimir / PDF.
 

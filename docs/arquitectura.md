@@ -96,14 +96,15 @@ Cero doble entrada: el alta es automática y el equipo (capa C) consume la misma
 | v2 Match | `POST /webhook/v2-match-oferta` | `{cvId, oferta_texto}` | `{matchScore, porCategoria, cubre, noCubre}` |
 | v2 Guardar hueco | `POST /webhook/v2-guardar-hueco` | `{cvId, requisito, respuesta}` | `{ok}` |
 | v2 CV adaptado | `POST /webhook/v2-cv-adaptado` | `{cvId, oferta_texto}` | `{secciones[]}` |
-| v2 Oferta desde URL | `POST /webhook/v2-oferta-url` | `{url}` | `{oferta_texto}` |
+| v2 Oferta desde URL | `POST /webhook/v2-oferta-url` | `{url}` | `{oferta_texto, titulo, empresa}` (fetch directo + plan B automático vía r.jina.ai si el sitio bloquea) |
+| v2 Mejorar bullet | `POST /webhook/v2-mejorar-bullet` | `{texto, origen, oferta_texto}` | `{alternativas[3]}` (guardarraíl: solo lo que respalda el origen) |
 | v2 Postulaciones | `GET /webhook/v2-postulaciones` · `POST /webhook/v2-postulaciones-alta` | `{empresa, puesto, ...}` | lista · `{ok, id}` |
 
 Los flujos v1 del PoC original siguen activos e intactos: v1 y v2 conviven (demo "antes y después").
 
-## Límites conocidos (v2, honestos)
+## Límites conocidos (v2.1, honestos)
 
 - Sin OCR: un PDF escaneado pide pegar el texto a mano.
-- Ofertas por URL: LinkedIn suele bloquear la lectura anónima (fallback: pegar el texto). Portales públicos funcionan.
+- Ofertas por URL: si el sitio bloquea el fetch directo, se reintenta automáticamente vía r.jina.ai (proxy de lectura). Si aun así no se puede, la web pide pegar el texto.
 - Identidad por navegador (UUID), sin login.
 - La descarga .docx ATS es de la capa C; la web ofrece imprimir / guardar PDF.
