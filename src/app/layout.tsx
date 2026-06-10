@@ -4,6 +4,7 @@ import "./globals.css";
 import Nav from "@/components/ui/Nav";
 import Footer from "@/components/ui/Footer";
 import { ToastProvider } from "@/components/ui/Toast";
+import { AuthProvider } from "@/lib/auth";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -36,9 +37,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={`${fraunces.variable} ${inter.variable}`}>
       <body className="min-h-screen flex flex-col">
         <ToastProvider>
-          <Nav />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          <AuthProvider>
+            <Nav />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </AuthProvider>
         </ToastProvider>
       </body>
     </html>
