@@ -187,11 +187,11 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        {/* Hoja Harvard (clon de la plantilla) */}
-        <div className="cv-paper rounded-xl px-10 py-9 text-[13px] leading-[1.45] text-[#111]">
-          <p className="text-center font-display text-[26px] font-bold leading-tight">{contacto.nombre}</p>
-          {lineaContacto && <p className="mt-1 text-center text-[12px]">{lineaContacto}</p>}
-          <div className="mb-4 mt-3 border-b-2 border-black" />
+        {/* Hoja Harvard (clon de la plantilla, compacta como el PDF) */}
+        <div className="cv-paper rounded-xl px-9 py-8 text-[10.5px] leading-[1.3] text-[#111]">
+          <p className="text-center text-[19px] font-bold leading-tight">{contacto.nombre}</p>
+          {lineaContacto && <p className="mt-0.5 text-center text-[10px] text-[#333]">{lineaContacto}</p>}
+          <div className="mb-2.5 mt-2 border-b-[1.5px] border-black" />
 
           {/* Perfil (clicable) */}
           <button
@@ -199,7 +199,7 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
               setSel({ perfil: true });
               setAlternativas(null);
             }}
-            className={`w-full rounded px-1 py-0.5 text-left text-[13px] leading-relaxed ${
+            className={`block w-full rounded px-1 text-justify text-[10.5px] leading-[1.35] ${
               sel && "perfil" in sel ? "sel" : ""
             }`}
           >
@@ -209,35 +209,35 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
           {secciones.map((sec, siOriginal) => {
             const si = cv.secciones.indexOf(sec);
             return (
-              <section key={`${sec.tipo}-${siOriginal}`} className="mt-4">
-                <p className="text-center text-[13px] font-bold uppercase tracking-wide">{sec.titulo}</p>
+              <section key={`${sec.tipo}-${siOriginal}`} className="mt-3">
+                <p className="text-center text-[10.5px] font-bold uppercase tracking-wide">{sec.titulo}</p>
 
                 {sec.grupos?.map((g) => (
-                  <div key={g.categoria} className="mt-2 text-center">
-                    <p className="text-[13px] font-bold">{g.categoria}</p>
-                    <p className="text-[13px]">{g.items.join(", ")}</p>
+                  <div key={g.categoria} className="mt-1.5 text-center">
+                    <p className="text-[10.5px] font-bold">{g.categoria}</p>
+                    <p className="text-[10.5px]">{g.items.join(", ")}</p>
                   </div>
                 ))}
 
                 {sec.bloques?.map((b, bi) => (
-                  <div key={bi} className="mt-3">
+                  <div key={bi} className="mt-2.5">
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-[13px] uppercase">{b.empresa}</p>
-                      <p className="text-[13px]">{b.ubicacion}</p>
+                      <p className="text-[10.5px] uppercase">{b.empresa}</p>
+                      <p className="text-[10.5px]">{b.ubicacion}</p>
                     </div>
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-[13px] font-bold">{b.puesto}</p>
-                      <p className="text-[13px]">{b.fechas}</p>
+                      <p className="text-[10.5px] font-bold">{b.puesto}</p>
+                      <p className="text-[10.5px]">{b.fechas}</p>
                     </div>
                     {b.bullets && b.bullets.length > 0 && (
-                      <ul className="mt-1 list-disc space-y-1 pl-6">
+                      <ul className="mt-1 list-disc space-y-[3px] pl-5">
                         {b.bullets.map((bu, bui) => {
                           const activo = sel && "si" in sel && sel.si === si && sel.bi === bi && sel.bu === bui;
                           return (
                             <li key={bui}>
                               <button
                                 onClick={() => seleccionarBullet(si, bi, bui)}
-                                className={`w-full rounded px-1 py-0.5 text-left text-[13px] leading-snug ${activo ? "sel" : ""}`}
+                                className={`w-full rounded px-1 text-left text-[10.5px] leading-snug ${activo ? "sel" : ""}`}
                               >
                                 {bu.texto}
                               </button>
