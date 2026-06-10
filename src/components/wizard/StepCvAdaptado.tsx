@@ -1,27 +1,92 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
 import Pill from "@/components/ui/Pill";
+import ProcessLoader from "@/components/ui/ProcessLoader";
 import { useToast } from "@/components/ui/Toast";
-import { addPostulacion } from "@/lib/api";
+import { addPostulacion, mejorarBullet } from "@/lib/api";
 import { getCvId } from "@/lib/session";
 import type { BulletCv, CvAdaptado } from "@/lib/types";
+import type { OfertaMeta } from "./Wizard";
 
 type Props = {
   adaptado: CvAdaptado | null;
   busy: boolean;
   matchScore: number;
+  ofertaTexto: string;
+  ofertaMeta: OfertaMeta;
   onVolver: () => void;
 };
 
-export default function StepCvAdaptado({ adaptado, busy, matchScore, onVolver }: Props) {
+const STAGES_CV = [
+  "Leyendo todos tus hechos con origen",
+  "Seleccionando los más relevantes para la oferta",
+  "Redactando cada bullet (solo con tus hechos)",
+  "Citando el origen de cada línea",
+];
+
+type Sel = { s: number; b: number } | null;
+
+export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto, ofertaMeta, onVolver }: Props) {
   const toast = useToast();
-  const [seleccionado, setSeleccionado] = useState<BulletCv | null>(null);
+  // Copia editable del CV (para reemplazar bullets con las alternativas de la IA).
+  const [secciones, setSecciones] = useState(adaptado?.secciones ?? []);
+  const [sel, setSel] = useState<Sel>(null);
+  const [alternativas, setAlternativas] = useState<string[] | null>(null);
+  const [mejorando, setMejorando] = useState(false);
+
   const [empresa, setEmpresa] = useState("");
   const [puesto, setPuesto] = useState("");
   const [guardandoTracker, setGuardandoTracker] = useState(false);
   const [trackerOk, setTrackerOk] = useState(false);
+
+  // Sincronizar cuando llega el CV generado + autorellenar empresa/puesto desde la oferta.
+  useEffect(() => {
+    if (adaptado) setSecciones(adaptado.secciones);
+  }, [adaptado]);
+  useEffect(() => {
+    if (ofertaMeta.empresa) setEmpresa((v) => v || ofertaMeta.empresa);
+    if (ofertaMeta.titulo) setPuesto((v) => v || ofertaMeta.titulo);
+  }, [ofertaMeta]);
+
+  const bulletSel: BulletCv | null = sel ? secciones[sel.s]?.bullets[sel.b] ?? null : null;
+
+  function seleccionar(s: number, b: number) {
+    setSel({ s, b });
+    setAlternativas(null);
+  }
+
+  async function pedirAlternativas() {
+    if (!bulletSel) return;
+    setMejorando(true);
+    setAlternativas(null);
+    try {
+      const r = await mejorarBullet(bulletSel.texto, bulletSel.origen, ofertaTexto);
+      if (!r.alternativas?.length) throw new Error("sin alternativas");
+      setAlternativas(r.alternativas);
+    } catch {
+      toast("No pude generar alternativas ahora. Reintenta.", "error");
+    } finally {
+      setMejorando(false);
+    }
+  }
+
+  function aplicarAlternativa(texto: string) {
+    if (!sel) return;
+    setSecciones((prev) =>
+      prev.map((s, si) =>
+        si !== sel.s
+          ? s
+          : {
+              ...s,
+              bullets: s.bullets.map((b, bi) => (bi !== sel.b ? b : { ...b, texto })),
+            }
+      )
+    );
+    setAlternativas(null);
+    toast("Bullet actualizado. El origen se mantiene.", "ok");
+  }
 
   async function guardarEnTracker() {
     if (!empresa.trim()) {
@@ -47,24 +112,16 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, onVolver }:
     }
   }
 
-  if (busy || !adaptado) {
+  if (busy || !secciones.length) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4 py-10">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
+      <div className="py-10">
+        <h1 className="mb-2 text-center font-display text-3xl font-semibold tracking-tight">
           Redactando tu CV <em className="text-accent">adaptado</em>…
         </h1>
-        <p className="text-sm text-muted-2">
-          Jano está reordenando y reformulando tus hechos para esta oferta. No inventa nada: cada
-          bullet citará su origen.
+        <p className="mb-8 text-center text-sm text-muted-2">
+          Nada se inventa: cada bullet citará su origen.
         </p>
-        <div className="space-y-3 pt-4" aria-live="polite" aria-label="Generando CV">
-          <div className="skeleton h-7 w-1/3" />
-          <div className="skeleton h-4 w-full" />
-          <div className="skeleton h-4 w-5/6" />
-          <div className="skeleton h-7 w-1/4" />
-          <div className="skeleton h-4 w-full" />
-          <div className="skeleton h-4 w-4/6" />
-        </div>
+        <ProcessLoader stages={STAGES_CV} stepMs={2000} />
       </div>
     );
   }
@@ -77,7 +134,8 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, onVolver }:
             CV <em className="text-accent">adaptado</em>.
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-2">
-            Haz clic en cualquier bullet para ver su origen exacto en tu base de hechos.
+            Haz clic en un bullet para auditar su origen o pedirle a la IA otras redacciones (sin
+            salirse del hecho).
           </p>
         </div>
         <div className="flex gap-2">
@@ -93,42 +151,74 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, onVolver }:
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         {/* Hoja del CV */}
         <div className="print-area rounded-2xl border border-line bg-surface p-8 shadow-card">
-          {adaptado.secciones.map((s) => (
+          {secciones.map((s, si) => (
             <section key={s.titulo} className="mb-6 last:mb-0">
               <h2 className="border-b border-line pb-1.5 font-display text-lg font-semibold uppercase tracking-wide">
                 {s.titulo}
               </h2>
               <ul className="mt-3 space-y-2">
-                {s.bullets.map((b, i) => (
-                  <li key={i}>
-                    <button
-                      onClick={() => setSeleccionado(b)}
-                      className={`w-full rounded-lg px-3 py-1.5 text-left text-sm leading-relaxed transition ${
-                        seleccionado === b ? "bg-tint ring-1 ring-accent/40" : "hover:bg-tint/60"
-                      }`}
-                    >
-                      {b.texto}
-                    </button>
-                  </li>
-                ))}
+                {s.bullets.map((b, bi) => {
+                  const activo = sel?.s === si && sel?.b === bi;
+                  return (
+                    <li key={bi}>
+                      <button
+                        onClick={() => seleccionar(si, bi)}
+                        className={`w-full rounded-lg px-3 py-1.5 text-left text-sm leading-relaxed transition ${
+                          activo ? "bg-tint ring-1 ring-accent/40" : "hover:bg-tint/60"
+                        }`}
+                      >
+                        {b.texto}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           ))}
         </div>
 
-        {/* Panel de trazabilidad + tracker */}
+        {/* Panel: trazabilidad + IA + tracker */}
         <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <div className="rounded-2xl border border-line bg-surface p-6 shadow-card">
-            <h3 className="font-display text-lg font-semibold">Origen del bullet</h3>
-            <p className="mt-1 text-xs text-muted">Clic en cualquier línea del CV para auditarla.</p>
-            {seleccionado ? (
-              <div className="mt-4 rounded-xl border border-accent/20 bg-tint p-4">
-                <Pill tone="accent">Origen verificado</Pill>
-                <p className="mt-3 text-sm font-medium leading-relaxed">&ldquo;{seleccionado.origen}&rdquo;</p>
-                <p className="mt-2 text-xs leading-relaxed text-muted-2">
-                  Este bullet se apoya en ese hecho de tu base. Si el hecho no existiera, el bullet
-                  tampoco.
-                </p>
+            <h3 className="font-display text-lg font-semibold">Auditar y mejorar</h3>
+            <p className="mt-1 text-xs text-muted">Clic en cualquier línea del CV.</p>
+            {bulletSel ? (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-xl border border-accent/20 bg-tint p-4">
+                  <Pill tone="accent">Origen verificado</Pill>
+                  <p className="mt-3 text-sm font-medium leading-relaxed">&ldquo;{bulletSel.origen}&rdquo;</p>
+                </div>
+                <Button variant="mini" onClick={pedirAlternativas} disabled={mejorando}>
+                  {mejorando ? "Pensando alternativas…" : "✦ Proponer otras redacciones"}
+                </Button>
+                {mejorando && (
+                  <div className="space-y-2" aria-live="polite">
+                    <div className="skeleton h-9 w-full" />
+                    <div className="skeleton h-9 w-full" />
+                    <div className="skeleton h-9 w-5/6" />
+                  </div>
+                )}
+                {alternativas && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                      Elige una (mismo hecho, otra voz)
+                    </p>
+                    {alternativas.map((a, i) => (
+                      <button
+                        key={i}
+                        onClick={() => aplicarAlternativa(a)}
+                        className="pop block w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-left text-xs leading-relaxed transition hover:border-accent/50 hover:bg-tint"
+                        style={{ animationDelay: `${i * 90}ms` }}
+                      >
+                        {a}
+                      </button>
+                    ))}
+                    <p className="text-[11px] leading-relaxed text-muted">
+                      Guardarraíl activo: las alternativas solo pueden afirmar lo que respalda el
+                      hecho de origen.
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="mt-4 rounded-xl border border-dashed border-line p-4 text-center text-xs italic text-muted">
@@ -144,7 +234,9 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, onVolver }:
             </p>
             {trackerOk ? (
               <div className="mt-4 space-y-3">
-                <Pill tone="ok">Registrada en el tracker</Pill>
+                <span className="pop inline-block">
+                  <Pill tone="ok">Registrada en el tracker</Pill>
+                </span>
                 <Button variant="ghost" href="/tracker/">
                   Ver mi tracker
                 </Button>

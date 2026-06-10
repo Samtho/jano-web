@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Button from "@/components/ui/Button";
 import CategoryBars from "@/components/ui/CategoryBars";
+import Confetti from "@/components/ui/Confetti";
 import Pill from "@/components/ui/Pill";
 import ScoreRing from "@/components/ui/ScoreRing";
 import type { MatchResult } from "@/lib/types";
@@ -17,9 +19,12 @@ type Props = {
 export default function StepMatch({ match, prevScore, onCerrarHuecos, onGenerarCv, onVolver }: Props) {
   const delta = prevScore !== null ? match.matchScore - prevScore : null;
   const huecos = match.noCubre.length;
+  // Celebracion: score fuerte o subida tras cerrar huecos.
+  const [celebrar, setCelebrar] = useState(match.matchScore >= 70 || (delta !== null && delta > 0));
 
   return (
     <div>
+      {celebrar && <Confetti onDone={() => setCelebrar(false)} />}
       <h1 className="font-display text-3xl font-semibold tracking-tight md:text-4xl">
         El <em className="text-accent">cruce</em>.
       </h1>
@@ -32,9 +37,11 @@ export default function StepMatch({ match, prevScore, onCerrarHuecos, onGenerarC
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface p-8 shadow-card">
           <ScoreRing value={match.matchScore} size={190} />
           {delta !== null && delta !== 0 && (
-            <Pill tone={delta > 0 ? "ok" : "danger"}>
-              {delta > 0 ? `+${delta} puntos` : `${delta} puntos`}
-            </Pill>
+            <span className="pop">
+              <Pill tone={delta > 0 ? "ok" : "danger"}>
+                {delta > 0 ? `+${delta} puntos tras cerrar huecos` : `${delta} puntos`}
+              </Pill>
+            </span>
           )}
           <div className="w-full border-t border-line pt-4">
             <CategoryBars porCategoria={match.porCategoria} />

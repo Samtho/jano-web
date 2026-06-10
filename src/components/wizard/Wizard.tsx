@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Stepper from "@/components/ui/Stepper";
 import { useToast } from "@/components/ui/Toast";
 import * as api from "@/lib/api";
@@ -14,6 +14,8 @@ import StepCvAdaptado from "./StepCvAdaptado";
 
 const STEPS = ["Tu CV", "La oferta", "El match", "Huecos", "CV adaptado"];
 
+export type OfertaMeta = { titulo: string; empresa: string };
+
 export default function Wizard() {
   const toast = useToast();
   const [step, setStep] = useState(1);
@@ -26,6 +28,7 @@ export default function Wizard() {
 
   // Paso 2: oferta
   const [ofertaTexto, setOfertaTexto] = useState("");
+  const [ofertaMeta, setOfertaMeta] = useState<OfertaMeta>({ titulo: "", empresa: "" });
   const [matchBusy, setMatchBusy] = useState(false);
 
   // Paso 3-4: match y huecos
@@ -33,9 +36,11 @@ export default function Wizard() {
   const [prevScore, setPrevScore] = useState<number | null>(null);
   const [respondidos, setRespondidos] = useState<string[]>([]);
 
-  // Paso 5: CV adaptado
+  // Paso 5: CV adaptado. Se PREGENERA en segundo plano al terminar el match,
+  // asi el paso 5 suele abrirse al instante.
   const [adaptado, setAdaptado] = useState<CvAdaptado | null>(null);
   const [adaptadoBusy, setAdaptadoBusy] = useState(false);
+  const prefetchRef = useRef<Promise<CvAdaptado> | null>(null);
 
   // Restaurar sesion del navegador (solo en cliente).
   useEffect(() => {
@@ -66,7 +71,9 @@ export default function Wizard() {
       setCvGuardado(true);
       // El CV cambio: el match y el CV adaptado anteriores dejan de valer.
       setMatch(null);
+      setPrevScore(null);
       setAdaptado(null);
+      prefetchRef.current = null;
       setRespondidos([]);
       toast(`Base de hechos creada: ${r.guardados} hechos con origen`, "ok");
       go(2);
@@ -77,20 +84,33 @@ export default function Wizard() {
     }
   }
 
-  async function calcularMatch(origenPaso4 = false) {
+  // Pre-genera el CV adaptado en segundo plano (el truco de velocidad del paso 5).
+  function prefetchAdaptado(oferta: string) {
+    setAdaptado(null);
+    const p = api.cvAdaptado(getCvId(), oferta);
+    prefetchRef.current = p;
+    p.then((r) => {
+      if (prefetchRef.current === p) setAdaptado(r);
+    }).catch(() => {
+      if (prefetchRef.current === p) prefetchRef.current = null;
+    });
+  }
+
+  async function calcularMatch(desdeHuecos = false) {
     if (ofertaTexto.trim().length < 40) {
       toast("Pega el texto de la oferta (o usa el enlace) antes de calcular.", "error");
       return;
     }
     setMatchBusy(true);
-    if (match) setPrevScore(match.matchScore);
+    const scoreAnterior = match?.matchScore ?? null;
     try {
       saveOferta(ofertaTexto.trim());
       const r = await api.matchOferta(getCvId(), ofertaTexto.trim());
+      setPrevScore(desdeHuecos ? scoreAnterior : null);
       setMatch(r);
-      setAdaptado(null);
-      if (origenPaso4 && prevScoreRefSafe(match) !== null) {
-        const delta = r.matchScore - (match?.matchScore ?? 0);
+      prefetchAdaptado(ofertaTexto.trim());
+      if (desdeHuecos && scoreAnterior !== null) {
+        const delta = r.matchScore - scoreAnterior;
         if (delta > 0) toast(`Tu score subio ${delta} puntos`, "ok");
         else if (delta === 0) toast("El score se mantiene. Prueba con respuestas mas concretas.", "info");
       }
@@ -102,10 +122,6 @@ export default function Wizard() {
     }
   }
 
-  function prevScoreRefSafe(m: MatchResult | null) {
-    return m ? m.matchScore : null;
-  }
-
   async function responderHueco(requisito: string, respuesta: string) {
     await api.guardarHueco(getCvId(), requisito, respuesta);
     setRespondidos((r) => [...r, requisito]);
@@ -113,10 +129,13 @@ export default function Wizard() {
 
   async function generarAdaptado() {
     go(5);
-    if (adaptado || adaptadoBusy) return;
+    if (adaptado) return;
     setAdaptadoBusy(true);
     try {
-      const r = await api.cvAdaptado(getCvId(), ofertaTexto.trim());
+      // Si hay prefetch en vuelo, esperarlo; si no, pedirlo ahora.
+      const r = prefetchRef.current
+        ? await prefetchRef.current
+        : await api.cvAdaptado(getCvId(), ofertaTexto.trim());
       setAdaptado(r);
     } catch (e) {
       toast(`No pude generar el CV adaptado: ${e instanceof Error ? e.message : "error"}`, "error");
@@ -128,20 +147,16 @@ export default function Wizard() {
   return (
     <div className="mx-auto max-w-6xl px-5 py-10">
       <Stepper steps={STEPS} current={step} maxReached={maxReached} onGo={go} />
-      <div className="mt-8">
+      {/* key={step} reinicia la animacion de entrada en cada cambio de paso */}
+      <div key={step} className="step-in mt-8">
         {step === 1 && (
-          <StepCv
-            texto={cvTexto}
-            onTexto={setCvTexto}
-            guardado={cvGuardado}
-            busy={cvBusy}
-            onGuardar={guardarCv}
-          />
+          <StepCv texto={cvTexto} onTexto={setCvTexto} guardado={cvGuardado} busy={cvBusy} onGuardar={guardarCv} />
         )}
         {step === 2 && (
           <StepOferta
             texto={ofertaTexto}
             onTexto={setOfertaTexto}
+            onMeta={setOfertaMeta}
             busy={matchBusy}
             onCalcular={() => calcularMatch(false)}
             onVolver={() => go(1)}
@@ -169,8 +184,10 @@ export default function Wizard() {
         {step === 5 && (
           <StepCvAdaptado
             adaptado={adaptado}
-            busy={adaptadoBusy}
+            busy={adaptadoBusy && !adaptado}
             matchScore={match?.matchScore ?? 0}
+            ofertaTexto={ofertaTexto}
+            ofertaMeta={ofertaMeta}
             onVolver={() => go(3)}
           />
         )}

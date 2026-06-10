@@ -10,21 +10,36 @@ const PATHS = {
   guardarHueco: "/v2-guardar-hueco",
   cvAdaptado: "/v2-cv-adaptado",
   ofertaDesdeUrl: "/v2-oferta-url",
+  mejorarBullet: "/v2-mejorar-bullet",
   postulaciones: "/v2-postulaciones",
   postulacionesAlta: "/v2-postulaciones-alta",
 } as const;
 
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.detalle || data.error || data.message || `Error ${res.status}`);
+// POST con un reintento automatico ante fallo de red o 5xx (a prueba de demo).
+async function post<T>(path: string, body: unknown, intento = 1): Promise<T> {
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.status >= 500 && intento === 1) {
+      await new Promise((r) => setTimeout(r, 700));
+      return post<T>(path, body, 2);
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detalle || data.error || data.message || `Error ${res.status}`);
+    }
+    return data as T;
+  } catch (e) {
+    if (intento === 1 && e instanceof TypeError) {
+      // Fallo de red: un solo reintento con pausa corta.
+      await new Promise((r) => setTimeout(r, 700));
+      return post<T>(path, body, 2);
+    }
+    throw e;
   }
-  return data as T;
 }
 
 export function ingestCv(cvId: string, textoCV: string) {
@@ -44,7 +59,15 @@ export function cvAdaptado(cvId: string, ofertaTexto: string) {
 }
 
 export function ofertaDesdeUrl(url: string) {
-  return post<{ oferta_texto: string }>(PATHS.ofertaDesdeUrl, { url });
+  return post<{ oferta_texto: string; titulo?: string; empresa?: string }>(PATHS.ofertaDesdeUrl, { url });
+}
+
+export function mejorarBullet(texto: string, origen: string, ofertaTexto: string) {
+  return post<{ alternativas: string[] }>(PATHS.mejorarBullet, {
+    texto,
+    origen,
+    oferta_texto: ofertaTexto,
+  });
 }
 
 export async function getPostulaciones(): Promise<Postulacion[]> {

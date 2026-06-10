@@ -4,8 +4,16 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import FileDrop from "@/components/ui/FileDrop";
 import Pill from "@/components/ui/Pill";
+import ProcessLoader from "@/components/ui/ProcessLoader";
 import { useToast } from "@/components/ui/Toast";
 import { extractTextFromFile } from "@/lib/parsers";
+
+const STAGES_INGESTA = [
+  "Leyendo tu CV",
+  "Extrayendo hechos con su origen",
+  "Vectorizando cada hecho (embeddings)",
+  "Guardando tu base de hechos",
+];
 
 type Props = {
   texto: string;
@@ -18,6 +26,17 @@ type Props = {
 export default function StepCv({ texto, onTexto, guardado, busy, onGuardar }: Props) {
   const toast = useToast();
   const [parsing, setParsing] = useState(false);
+
+  if (busy) {
+    return (
+      <div className="py-10">
+        <h1 className="mb-8 text-center font-display text-3xl font-semibold tracking-tight">
+          Construyendo tu base de <em className="text-accent">hechos</em>…
+        </h1>
+        <ProcessLoader stages={STAGES_INGESTA} stepMs={2200} />
+      </div>
+    );
+  }
 
   async function handleFile(file: File) {
     setParsing(true);
