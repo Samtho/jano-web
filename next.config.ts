@@ -1,10 +1,14 @@
 import type { NextConfig } from "next";
 
-// Export estatico para GitHub Pages. basePath incondicional (dev = prod):
-// la app vive siempre bajo /jano-web, asi no hay sorpresas al desplegar.
+// basePath configurable por entorno:
+// - GitHub Pages: el workflow de deploy pone NEXT_PUBLIC_BASE_PATH=/jano-web
+//   (la app vive bajo /jano-web/).
+// - Vercel u otros: sin esa variable, la app vive en la raiz ("/").
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 const nextConfig: NextConfig = {
   output: "export",
-  basePath: "/jano-web",
+  basePath: basePath || undefined,
   trailingSlash: true,
   images: { unoptimized: true },
 };

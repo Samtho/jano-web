@@ -28,6 +28,8 @@ jobs:
         with:
           enablement: true
       - run: npm run build
+        env:
+          NEXT_PUBLIC_BASE_PATH: /jano-web
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./out
