@@ -35,14 +35,20 @@ export default function StepOferta({ texto, onTexto, onMeta, busy, onCalcular, o
     }
     setUrlBusy(true);
     try {
-      const r = await ofertaDesdeUrl(url.trim());
+      let r = await ofertaDesdeUrl(url.trim());
+      // El lector alternativo a veces se satura: un reintento automatico con pausa.
+      if (!r.oferta_texto || r.oferta_texto.length <= 100) {
+        toast("El lector está ocupado, reintentando automáticamente…", "info");
+        await new Promise((res) => setTimeout(res, 6000));
+        r = await ofertaDesdeUrl(url.trim());
+      }
       if (r.oferta_texto && r.oferta_texto.length > 100) {
         onTexto(r.oferta_texto);
         onMeta({ titulo: r.titulo ?? "", empresa: r.empresa ?? "" });
         const quien = r.empresa ? ` de ${r.empresa}` : "";
         toast(`Oferta${quien} extraída del enlace. Revísala antes de calcular.`, "ok");
       } else {
-        toast("Ese sitio no me dejó leer la oferta. Pega el texto a mano y seguimos.", "error");
+        toast("Ese sitio no se deja leer ahora mismo. Pega el texto a mano y seguimos igual.", "error");
       }
     } catch {
       toast("No pude leer la URL. Pega el texto de la oferta a mano.", "error");

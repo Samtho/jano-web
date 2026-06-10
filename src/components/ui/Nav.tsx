@@ -30,8 +30,8 @@ export default function Nav() {
           <span className="font-display text-xl font-semibold tracking-tight">
             Jano<span className="text-accent">.</span>
           </span>
-          <span className="hidden rounded-full border border-line bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted sm:inline">
-            2.0
+          <span className="hidden rounded-full border border-accent/30 bg-tint px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-accent-deep sm:inline">
+            2.1
           </span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">

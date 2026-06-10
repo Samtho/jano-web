@@ -38,6 +38,8 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
 
   const [empresa, setEmpresa] = useState("");
   const [puesto, setPuesto] = useState("");
+  const [sector, setSector] = useState("");
+  const [salario, setSalario] = useState("");
   const [guardandoTracker, setGuardandoTracker] = useState(false);
   const [trackerOk, setTrackerOk] = useState(false);
 
@@ -98,9 +100,9 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
       await addPostulacion({
         empresa: empresa.trim(),
         puesto: puesto.trim(),
-        sector: "",
+        sector: sector.trim(),
         match_score: matchScore,
-        salario: "",
+        salario: salario.trim(),
         cv_id: getCvId(),
       });
       setTrackerOk(true);
@@ -149,11 +151,11 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        {/* Hoja del CV */}
-        <div className="print-area rounded-2xl border border-line bg-surface p-8 shadow-card">
+        {/* Hoja del CV: papel real sobre el tema oscuro */}
+        <div className="print-area cv-paper rounded-2xl p-8">
           {secciones.map((s, si) => (
             <section key={s.titulo} className="mb-6 last:mb-0">
-              <h2 className="border-b border-line pb-1.5 font-display text-lg font-semibold uppercase tracking-wide">
+              <h2 className="border-b pb-1.5 font-display text-lg font-semibold uppercase tracking-wide">
                 {s.titulo}
               </h2>
               <ul className="mt-3 space-y-2">
@@ -163,9 +165,7 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
                     <li key={bi}>
                       <button
                         onClick={() => seleccionar(si, bi)}
-                        className={`w-full rounded-lg px-3 py-1.5 text-left text-sm leading-relaxed transition ${
-                          activo ? "bg-tint ring-1 ring-accent/40" : "hover:bg-tint/60"
-                        }`}
+                        className={`w-full rounded-lg px-3 py-1.5 text-left text-sm leading-relaxed transition ${activo ? "sel" : ""}`}
                       >
                         {b.texto}
                       </button>
@@ -257,6 +257,22 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
                   aria-label="Puesto"
                   className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50"
                 />
+                <div className="flex gap-2">
+                  <input
+                    value={sector}
+                    onChange={(e) => setSector(e.target.value)}
+                    placeholder="Sector (opcional)"
+                    aria-label="Sector"
+                    className="w-1/2 rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50"
+                  />
+                  <input
+                    value={salario}
+                    onChange={(e) => setSalario(e.target.value)}
+                    placeholder="Salario (opcional)"
+                    aria-label="Salario"
+                    className="w-1/2 rounded-xl border border-line bg-paper px-3.5 py-2 text-sm outline-none transition focus:border-accent/50"
+                  />
+                </div>
                 <Button onClick={guardarEnTracker} disabled={guardandoTracker} arrow>
                   {guardandoTracker ? "Registrando…" : "Marcar como enviada"}
                 </Button>

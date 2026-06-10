@@ -77,6 +77,10 @@ export async function getPostulaciones(): Promise<Postulacion[]> {
   return Array.isArray(data) ? data : [];
 }
 
+export function updatePostulacion(p: { id: string; estado?: string; sector?: string; salario?: string }) {
+  return post<{ ok: boolean }>("/v2-postulaciones-update", p);
+}
+
 export function addPostulacion(p: {
   empresa: string;
   puesto: string;
