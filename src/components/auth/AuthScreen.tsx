@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
@@ -20,6 +20,18 @@ export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // React no siempre aplica `muted` al DOM, y Chrome bloquea el autoplay si el
+  // video no esta muteado. Lo forzamos por codigo y disparamos el play.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = true;
+    v.play().catch(() => {
+      /* si el navegador igual lo bloquea, se ve el degradado de respaldo */
+    });
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -152,16 +164,17 @@ export default function AuthScreen() {
         <div className="absolute inset-0 bg-[radial-gradient(900px_500px_at_70%_20%,rgba(109,111,251,0.35),transparent_60%),radial-gradient(700px_500px_at_30%_90%,rgba(192,132,252,0.22),transparent_60%)]" />
         {/* Video de fondo (lo anades tu en public/auth-hero.mp4) */}
         <video
-          className="absolute inset-0 h-full w-full object-cover opacity-90"
+          ref={videoRef}
+          className="absolute inset-0 h-full w-full object-cover"
           autoPlay
           muted
           loop
           playsInline
-          poster={`${BASE_PATH}/auth-hero-poster.jpg`}
+          preload="auto"
         >
           <source src={`${BASE_PATH}/auth-hero.mp4`} type="video/mp4" />
         </video>
-        <div className="absolute inset-0 bg-gradient-to-t from-[#08090f] via-[#08090f]/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#08090f] via-[#08090f]/30 to-transparent" />
 
         <div className="relative flex h-full flex-col justify-end p-12">
           <div className="max-w-md rounded-2xl border border-white/10 bg-black/30 p-6 backdrop-blur-md">
