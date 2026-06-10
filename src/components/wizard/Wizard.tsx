@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Stepper from "@/components/ui/Stepper";
 import { useToast } from "@/components/ui/Toast";
 import * as api from "@/lib/api";
-import { getCvId, loadSession, saveCv, saveOferta } from "@/lib/session";
+import { getCvId, loadSession, newCvId, saveOferta, setActiveCvId } from "@/lib/session";
+import { listMyCvs, saveMyCv, type SavedCv } from "@/lib/cvs";
 import type { CvAdaptado, MatchResult } from "@/lib/types";
 import StepCv from "./StepCv";
 import StepOferta from "./StepOferta";
@@ -21,8 +22,10 @@ export default function Wizard() {
   const [step, setStep] = useState(1);
   const [maxReached, setMaxReached] = useState(1);
 
-  // Paso 1: CV
+  // Paso 1: CV (CVs guardados de la cuenta + subir uno nuevo)
+  const [savedCvs, setSavedCvs] = useState<SavedCv[] | null>(null);
   const [cvTexto, setCvTexto] = useState("");
+  const [nombreCv, setNombreCv] = useState("");
   const [cvGuardado, setCvGuardado] = useState(false);
   const [cvBusy, setCvBusy] = useState(false);
 
@@ -36,21 +39,15 @@ export default function Wizard() {
   const [prevScore, setPrevScore] = useState<number | null>(null);
   const [respondidos, setRespondidos] = useState<string[]>([]);
 
-  // Paso 5: CV adaptado. Se PREGENERA en segundo plano al terminar el match,
-  // asi el paso 5 suele abrirse al instante.
+  // Paso 5: CV adaptado (se pre-genera en segundo plano al terminar el match)
   const [adaptado, setAdaptado] = useState<CvAdaptado | null>(null);
   const [adaptadoBusy, setAdaptadoBusy] = useState(false);
   const prefetchRef = useRef<Promise<CvAdaptado> | null>(null);
 
-  // Restaurar sesion del navegador (solo en cliente).
   useEffect(() => {
     const s = loadSession();
-    if (s.cvTexto) setCvTexto(s.cvTexto);
-    if (s.cvGuardado) {
-      setCvGuardado(true);
-      setMaxReached((m) => Math.max(m, 2));
-    }
     if (s.ofertaTexto) setOfertaTexto(s.ofertaTexto);
+    listMyCvs().then(setSavedCvs).catch(() => setSavedCvs([]));
   }, []);
 
   function go(n: number) {
@@ -59,23 +56,45 @@ export default function Wizard() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function guardarCv() {
+  function resetDesdeCv() {
+    setMatch(null);
+    setPrevScore(null);
+    setAdaptado(null);
+    prefetchRef.current = null;
+    setRespondidos([]);
+  }
+
+  // Elegir un CV ya guardado en la cuenta: sus hechos ya estan en la base.
+  function usarCvGuardado(cvId: string, nombre: string) {
+    setActiveCvId(cvId);
+    setCvGuardado(true);
+    resetDesdeCv();
+    toast(`Usando "${nombre}". Ahora la oferta.`, "ok");
+    go(2);
+  }
+
+  // Subir un CV nuevo: se crea un cvId nuevo, se ingieren los hechos y se
+  // guarda en la cuenta con su nombre.
+  async function guardarCvNuevo() {
     if (cvTexto.trim().length < 50) {
       toast("El CV parece muy corto. Pega el texto completo o sube un archivo.", "error");
       return;
     }
+    if (!nombreCv.trim()) {
+      toast("Ponle un nombre a este CV (ej. CV Product Manager).", "error");
+      return;
+    }
     setCvBusy(true);
     try {
-      const r = await api.ingestCv(getCvId(), cvTexto.trim());
-      saveCv(cvTexto.trim(), true);
+      const cvId = newCvId();
+      const r = await api.ingestCv(cvId, cvTexto.trim());
+      await saveMyCv(cvId, nombreCv.trim());
       setCvGuardado(true);
-      // El CV cambio: el match y el CV adaptado anteriores dejan de valer.
-      setMatch(null);
-      setPrevScore(null);
-      setAdaptado(null);
-      prefetchRef.current = null;
-      setRespondidos([]);
-      toast(`Base de hechos creada: ${r.guardados} hechos con origen`, "ok");
+      resetDesdeCv();
+      listMyCvs().then(setSavedCvs).catch(() => {});
+      toast(`"${nombreCv.trim()}" guardado: ${r.guardados} hechos con origen`, "ok");
+      setNombreCv("");
+      setCvTexto("");
       go(2);
     } catch (e) {
       toast(`No pude procesar el CV: ${e instanceof Error ? e.message : "error"}`, "error");
@@ -84,7 +103,6 @@ export default function Wizard() {
     }
   }
 
-  // Pre-genera el CV adaptado en segundo plano (el truco de velocidad del paso 5).
   function prefetchAdaptado(oferta: string) {
     setAdaptado(null);
     const p = api.cvAdaptado(getCvId(), oferta);
@@ -132,7 +150,6 @@ export default function Wizard() {
     if (adaptado) return;
     setAdaptadoBusy(true);
     try {
-      // Si hay prefetch en vuelo, esperarlo; si no, pedirlo ahora.
       const r = prefetchRef.current
         ? await prefetchRef.current
         : await api.cvAdaptado(getCvId(), ofertaTexto.trim());
@@ -147,10 +164,18 @@ export default function Wizard() {
   return (
     <div className="mx-auto max-w-6xl px-5 py-10">
       <Stepper steps={STEPS} current={step} maxReached={maxReached} onGo={go} />
-      {/* key={step} reinicia la animacion de entrada en cada cambio de paso */}
       <div key={step} className="step-in mt-8">
         {step === 1 && (
-          <StepCv texto={cvTexto} onTexto={setCvTexto} guardado={cvGuardado} busy={cvBusy} onGuardar={guardarCv} />
+          <StepCv
+            texto={cvTexto}
+            onTexto={setCvTexto}
+            nombre={nombreCv}
+            onNombre={setNombreCv}
+            savedCvs={savedCvs}
+            onUsar={usarCvGuardado}
+            busy={cvBusy}
+            onGuardarNuevo={guardarCvNuevo}
+          />
         )}
         {step === 2 && (
           <StepOferta

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
 import FileDrop from "@/components/ui/FileDrop";
 import Pill from "@/components/ui/Pill";
 import ProcessLoader from "@/components/ui/ProcessLoader";
 import { useToast } from "@/components/ui/Toast";
 import { extractTextFromFile } from "@/lib/parsers";
+import type { SavedCv } from "@/lib/cvs";
 
 const STAGES_INGESTA = [
   "Leyendo tu CV",
@@ -18,14 +19,25 @@ const STAGES_INGESTA = [
 type Props = {
   texto: string;
   onTexto: (t: string) => void;
-  guardado: boolean;
+  nombre: string;
+  onNombre: (n: string) => void;
+  savedCvs: SavedCv[] | null;
+  onUsar: (cvId: string, nombre: string) => void;
   busy: boolean;
-  onGuardar: () => void;
+  onGuardarNuevo: () => void;
 };
 
-export default function StepCv({ texto, onTexto, guardado, busy, onGuardar }: Props) {
+export default function StepCv({ texto, onTexto, nombre, onNombre, savedCvs, onUsar, busy, onGuardarNuevo }: Props) {
   const toast = useToast();
   const [parsing, setParsing] = useState(false);
+  const [modo, setModo] = useState<"elegir" | "nuevo">("nuevo");
+  const [modoTocado, setModoTocado] = useState(false);
+  const tieneCvs = (savedCvs?.length ?? 0) > 0;
+
+  // Si hay CVs guardados y el usuario no ha tocado las pestanas, mostrar la lista.
+  useEffect(() => {
+    if (!modoTocado && tieneCvs) setModo("elegir");
+  }, [tieneCvs, modoTocado]);
 
   if (busy) {
     return (
@@ -51,6 +63,8 @@ export default function StepCv({ texto, onTexto, guardado, busy, onGuardar }: Pr
     }
   }
 
+  const mostrarLista = tieneCvs && modo === "elegir";
+
   return (
     <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
       <div>
@@ -58,32 +72,84 @@ export default function StepCv({ texto, onTexto, guardado, busy, onGuardar }: Pr
           Tu base de <em className="text-accent">hechos</em>.
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-2">
-          Sube tu CV en PDF, Word o texto. Jano lo convierte en hechos auditables con origen. Nada de
-          lo que no esté aquí saldrá después.
+          {tieneCvs
+            ? "Elige uno de tus CVs guardados o sube uno nuevo. Jano solo usará hechos que estén en él."
+            : "Sube tu CV en PDF, Word o texto. Jano lo convierte en hechos auditables con origen."}
         </p>
 
-        <div className="mt-6 space-y-4">
-          <FileDrop onFile={handleFile} busy={parsing} />
-          <div className="flex items-center gap-3 text-xs text-muted">
-            <span className="h-px flex-1 bg-line" />
-            o pega el texto
-            <span className="h-px flex-1 bg-line" />
+        {/* Selector: CVs guardados / subir nuevo */}
+        {tieneCvs && (
+          <div className="mt-5 inline-flex rounded-xl border border-line bg-surface p-1 text-sm">
+            <button
+              onClick={() => {
+                setModoTocado(true);
+                setModo("elegir");
+              }}
+              className={`rounded-lg px-4 py-1.5 font-semibold transition ${
+                modo === "elegir" ? "bg-tint text-accent-deep" : "text-muted-2 hover:text-ink"
+              }`}
+            >
+              Mis CVs guardados
+            </button>
+            <button
+              onClick={() => {
+                setModoTocado(true);
+                setModo("nuevo");
+              }}
+              className={`rounded-lg px-4 py-1.5 font-semibold transition ${
+                modo === "nuevo" ? "bg-tint text-accent-deep" : "text-muted-2 hover:text-ink"
+              }`}
+            >
+              Subir uno nuevo
+            </button>
           </div>
-          <textarea
-            value={texto}
-            onChange={(e) => onTexto(e.target.value)}
-            rows={12}
-            aria-label="Texto de tu CV"
-            placeholder="Pega aquí el texto completo de tu CV…"
-            className="w-full rounded-2xl border border-line bg-surface p-4 text-sm leading-relaxed shadow-card outline-none transition focus:border-accent/50"
-          />
-          <div className="flex items-center gap-3">
-            <Button onClick={onGuardar} disabled={busy || parsing} arrow>
-              {busy ? "Estructurando hechos…" : guardado ? "Actualizar mi base de hechos" : "Estructurar mis hechos"}
+        )}
+
+        {mostrarLista ? (
+          <ul className="mt-6 space-y-2">
+            {savedCvs!.map((cv) => (
+              <li
+                key={cv.id}
+                className="flex items-center justify-between rounded-2xl border border-line bg-surface px-5 py-4 shadow-card"
+              >
+                <div>
+                  <p className="font-semibold">{cv.nombre}</p>
+                  <p className="text-[11px] text-muted">Guardado el {cv.created_at.slice(0, 10)}</p>
+                </div>
+                <Button variant="mini" onClick={() => onUsar(cv.cv_id, cv.nombre)}>
+                  Usar este →
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="mt-6 space-y-4">
+            <FileDrop onFile={handleFile} busy={parsing} />
+            <div className="flex items-center gap-3 text-xs text-muted">
+              <span className="h-px flex-1 bg-line" />
+              o pega el texto
+              <span className="h-px flex-1 bg-line" />
+            </div>
+            <textarea
+              value={texto}
+              onChange={(e) => onTexto(e.target.value)}
+              rows={10}
+              aria-label="Texto de tu CV"
+              placeholder="Pega aquí el texto completo de tu CV…"
+              className="w-full rounded-2xl border border-line bg-surface p-4 text-sm leading-relaxed shadow-card outline-none transition focus:border-accent/50"
+            />
+            <input
+              value={nombre}
+              onChange={(e) => onNombre(e.target.value)}
+              placeholder="Nombre de este CV (ej. CV Product Manager)"
+              aria-label="Nombre del CV"
+              className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm shadow-card outline-none transition focus:border-accent/50"
+            />
+            <Button onClick={onGuardarNuevo} disabled={busy || parsing} arrow>
+              {busy ? "Estructurando hechos…" : "Guardar CV y continuar"}
             </Button>
-            {guardado && <Pill tone="ok">CV guardado</Pill>}
           </div>
-        </div>
+        )}
       </div>
 
       <aside className="space-y-4">
@@ -99,13 +165,13 @@ export default function StepCv({ texto, onTexto, guardado, busy, onGuardar }: Pr
           <Pill tone="accent">Regla 02</Pill>
           <h3 className="mt-3 font-display text-xl font-semibold">Trazabilidad por bullet</h3>
           <p className="mt-2 text-sm leading-relaxed text-muted-2">
-            Cada línea del CV adaptado podrá rastrearse hasta una porción concreta de este texto. Sin
+            Cada línea del CV adaptado podrá rastrearse hasta una porción concreta de tu CV. Sin
             origen, no entra.
           </p>
         </div>
         <div className="rounded-2xl border border-line bg-paper p-5 text-xs leading-relaxed text-muted">
-          Tu CV se procesa con tu propio identificador anónimo. El texto se extrae del archivo en tu
-          navegador: el PDF nunca se sube a ningún sitio.
+          Cada CV que guardas tiene su propia base de hechos. El archivo se lee en tu navegador: el
+          PDF nunca se sube a ningún sitio.
         </div>
       </aside>
     </div>

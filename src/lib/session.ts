@@ -19,6 +19,18 @@ export function getCvId(): string {
   return id;
 }
 
+// Cambia el CV activo (al elegir uno guardado de la cuenta).
+export function setActiveCvId(id: string) {
+  localStorage.setItem(KEYS.cvId, id);
+}
+
+// Genera y activa un cvId nuevo (al subir un CV nuevo).
+export function newCvId(): string {
+  const id = crypto.randomUUID();
+  localStorage.setItem(KEYS.cvId, id);
+  return id;
+}
+
 export function loadSession() {
   return {
     cvTexto: localStorage.getItem(KEYS.cvTexto) ?? "",

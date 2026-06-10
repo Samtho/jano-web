@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import Protected from "@/components/auth/Protected";
-import TrackerView from "@/components/tracker/TrackerView";
+import CuentaView from "@/components/cuenta/CuentaView";
 
 export const metadata: Metadata = {
-  title: "Tracker · Jano",
+  title: "Mi cuenta · Jano",
 };
 
-export default function TrackerPage() {
+export default function CuentaPage() {
   return (
     <Protected>
-      <TrackerView />
+      <CuentaView />
     </Protected>
   );
 }

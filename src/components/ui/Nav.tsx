@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
-const LINKS = [
+const APP_LINKS = [
   { href: "/app/", label: "Adaptar CV" },
   { href: "/tracker/", label: "Tracker" },
   { href: "/como-funciona/", label: "Cómo funciona" },
 ];
+const PUBLIC_LINKS = [{ href: "/como-funciona/", label: "Cómo funciona" }];
 
 // Logotipo Jano: las dos caras (atras y adelante).
 export function JanoMark({ size = 34 }: { size?: number }) {
@@ -28,6 +29,7 @@ export default function Nav() {
   // La pantalla de entrada va a pantalla completa, sin nav.
   if (pathname?.startsWith("/entrar")) return null;
 
+  const links = user ? APP_LINKS : PUBLIC_LINKS;
   const nombre = (user?.user_metadata?.nombre as string) || user?.email?.split("@")[0];
 
   return (
@@ -43,14 +45,14 @@ export default function Nav() {
           </span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">
-          {LINKS.map((l) => {
+          {links.map((l) => {
             const active = pathname?.startsWith(l.href.replace(/\/$/, ""));
             return (
               <Link
                 key={l.href}
                 href={l.href}
                 aria-current={active ? "page" : undefined}
-                className={`rounded-lg px-3 py-2 font-medium transition-colors ${
+                className={`hidden rounded-lg px-3 py-2 font-medium transition-colors sm:block ${
                   active ? "bg-tint text-accent-deep" : "text-muted-2 hover:bg-surface hover:text-ink"
                 }`}
               >
@@ -60,9 +62,18 @@ export default function Nav() {
           })}
           {user ? (
             <div className="ml-2 flex items-center gap-2">
-              <span className="hidden max-w-[140px] truncate text-xs text-muted sm:inline" title={user.email ?? ""}>
-                {nombre}
-              </span>
+              <Link
+                href="/cuenta/"
+                aria-current={pathname?.startsWith("/cuenta") ? "page" : undefined}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 font-medium transition-colors ${
+                  pathname?.startsWith("/cuenta") ? "bg-tint text-accent-deep" : "text-muted-2 hover:bg-surface hover:text-ink"
+                }`}
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-[11px] font-bold uppercase text-white">
+                  {(nombre ?? "?").charAt(0)}
+                </span>
+                <span className="hidden max-w-[120px] truncate md:inline">{nombre}</span>
+              </Link>
               <button
                 onClick={() => signOut()}
                 className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-muted-2 transition hover:border-accent/40 hover:text-ink"

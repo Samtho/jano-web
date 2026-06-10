@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Protected from "@/components/auth/Protected";
 import Wizard from "@/components/wizard/Wizard";
 
 export const metadata: Metadata = {
@@ -6,5 +7,9 @@ export const metadata: Metadata = {
 };
 
 export default function AppPage() {
-  return <Wizard />;
+  return (
+    <Protected>
+      <Wizard />
+    </Protected>
+  );
 }
