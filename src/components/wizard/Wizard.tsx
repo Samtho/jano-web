@@ -26,12 +26,13 @@ export default function Wizard() {
   const [savedCvs, setSavedCvs] = useState<SavedCv[] | null>(null);
   const [cvTexto, setCvTexto] = useState("");
   const [nombreCv, setNombreCv] = useState("");
-  const [cvGuardado, setCvGuardado] = useState(false);
+  const [archivoCv, setArchivoCv] = useState<File | null>(null);
   const [cvBusy, setCvBusy] = useState(false);
 
   // Paso 2: oferta
   const [ofertaTexto, setOfertaTexto] = useState("");
   const [ofertaMeta, setOfertaMeta] = useState<OfertaMeta>({ titulo: "", empresa: "" });
+  const [ofertaDelMatch, setOfertaDelMatch] = useState(""); // la oferta con la que se calculo el match vigente
   const [matchBusy, setMatchBusy] = useState(false);
 
   // Paso 3-4: match y huecos
@@ -62,12 +63,22 @@ export default function Wizard() {
     setAdaptado(null);
     prefetchRef.current = null;
     setRespondidos([]);
+    // Los pasos 3-5 dejan de ser alcanzables: sus datos ya no valen.
+    setMaxReached(2);
+  }
+
+  // Editar la oferta invalida el match vigente (evita scores de la oferta anterior).
+  function cambiarOferta(texto: string) {
+    setOfertaTexto(texto);
+    if (match && texto.trim() !== ofertaDelMatch) {
+      resetDesdeCv();
+      toast("La oferta cambió: recalcula el match.", "info");
+    }
   }
 
   // Elegir un CV ya guardado en la cuenta: sus hechos ya estan en la base.
   function usarCvGuardado(cvId: string, nombre: string) {
     setActiveCvId(cvId);
-    setCvGuardado(true);
     resetDesdeCv();
     toast(`Usando "${nombre}". Ahora la oferta.`, "ok");
     go(2);
@@ -88,8 +99,8 @@ export default function Wizard() {
     try {
       const cvId = newCvId();
       const r = await api.ingestCv(cvId, cvTexto.trim());
-      await saveMyCv(cvId, nombreCv.trim());
-      setCvGuardado(true);
+      await saveMyCv(cvId, nombreCv.trim(), archivoCv);
+      setArchivoCv(null);
       resetDesdeCv();
       listMyCvs().then(setSavedCvs).catch(() => {});
       toast(`"${nombreCv.trim()}" guardado: ${r.guardados} hechos con origen`, "ok");
@@ -130,6 +141,7 @@ export default function Wizard() {
       const r = await api.matchOferta(getCvId(), ofertaTexto.trim());
       setPrevScore(desdeHuecos ? scoreAnterior : null);
       setMatch(r);
+      setOfertaDelMatch(ofertaTexto.trim());
       prefetchAdaptado(ofertaTexto.trim());
       if (desdeHuecos && scoreAnterior !== null) {
         const delta = r.matchScore - scoreAnterior;
@@ -179,12 +191,13 @@ export default function Wizard() {
             onUsar={usarCvGuardado}
             busy={cvBusy}
             onGuardarNuevo={guardarCvNuevo}
+            onArchivo={setArchivoCv}
           />
         )}
         {step === 2 && (
           <StepOferta
             texto={ofertaTexto}
-            onTexto={setOfertaTexto}
+            onTexto={cambiarOferta}
             onMeta={setOfertaMeta}
             busy={matchBusy}
             onCalcular={() => calcularMatch(false)}

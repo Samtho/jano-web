@@ -7,6 +7,7 @@ import Pill from "@/components/ui/Pill";
 import ProcessLoader from "@/components/ui/ProcessLoader";
 import { useToast } from "@/components/ui/Toast";
 import { extractTextFromFile } from "@/lib/parsers";
+import { getCvId } from "@/lib/session";
 import type { SavedCv } from "@/lib/cvs";
 
 const STAGES_INGESTA = [
@@ -25,14 +26,20 @@ type Props = {
   onUsar: (cvId: string, nombre: string) => void;
   busy: boolean;
   onGuardarNuevo: () => void;
+  onArchivo: (f: File) => void;
 };
 
-export default function StepCv({ texto, onTexto, nombre, onNombre, savedCvs, onUsar, busy, onGuardarNuevo }: Props) {
+export default function StepCv({ texto, onTexto, nombre, onNombre, savedCvs, onUsar, busy, onGuardarNuevo, onArchivo }: Props) {
   const toast = useToast();
   const [parsing, setParsing] = useState(false);
   const [modo, setModo] = useState<"elegir" | "nuevo">("nuevo");
   const [modoTocado, setModoTocado] = useState(false);
+  const [activoCvId, setActivoCvId] = useState("");
   const tieneCvs = (savedCvs?.length ?? 0) > 0;
+
+  useEffect(() => {
+    setActivoCvId(getCvId());
+  }, []);
 
   // Si hay CVs guardados y el usuario no ha tocado las pestanas, mostrar la lista.
   useEffect(() => {
@@ -55,6 +62,7 @@ export default function StepCv({ texto, onTexto, nombre, onNombre, savedCvs, onU
     try {
       const extraido = await extractTextFromFile(file);
       onTexto(extraido);
+      onArchivo(file); // el original se guarda en la cuenta para re-descargarlo
       toast(`Texto extraído de ${file.name}. Revísalo antes de continuar.`, "ok");
     } catch (e) {
       toast(e instanceof Error ? e.message : "No pude leer el archivo", "error");
@@ -113,7 +121,10 @@ export default function StepCv({ texto, onTexto, nombre, onNombre, savedCvs, onU
                 className="flex items-center justify-between rounded-2xl border border-line bg-surface px-5 py-4 shadow-card"
               >
                 <div>
-                  <p className="font-semibold">{cv.nombre}</p>
+                  <p className="flex items-center gap-2 font-semibold">
+                    {cv.nombre}
+                    {cv.cv_id === activoCvId && <Pill tone="ok">En uso</Pill>}
+                  </p>
                   <p className="text-[11px] text-muted">Guardado el {cv.created_at.slice(0, 10)}</p>
                 </div>
                 <Button variant="mini" onClick={() => onUsar(cv.cv_id, cv.nombre)}>

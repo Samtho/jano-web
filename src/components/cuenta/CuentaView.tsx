@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Pill from "@/components/ui/Pill";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { deleteMyCv, listMyCvs, type SavedCv } from "@/lib/cvs";
+import { deleteMyCv, descargarOriginal, listMyCvs, renameMyCv, type SavedCv } from "@/lib/cvs";
 import { getMyProfile, updateMyProfile } from "@/lib/profile";
+import { getCvId, setActiveCvId } from "@/lib/session";
 
 function Card({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
@@ -35,6 +37,27 @@ export default function CuentaView() {
   const [savingPass, setSavingPass] = useState(false);
 
   const [cvs, setCvs] = useState<SavedCv[] | null>(null);
+  const [activoCvId, setActivoCvId] = useState("");
+  const [renombrando, setRenombrando] = useState<string | null>(null);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+
+  useEffect(() => {
+    setActivoCvId(getCvId());
+  }, []);
+
+  async function confirmarRenombre(id: string) {
+    const nombreLimpio = nuevoNombre.trim();
+    setRenombrando(null);
+    const actual = cvs?.find((c) => c.id === id);
+    if (!nombreLimpio || !actual || nombreLimpio === actual.nombre) return;
+    try {
+      await renameMyCv(id, nombreLimpio);
+      setCvs((prev) => prev?.map((c) => (c.id === id ? { ...c, nombre: nombreLimpio } : c)) ?? null);
+      toast("CV renombrado.", "ok");
+    } catch {
+      toast("No pude renombrarlo.", "error");
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -196,30 +219,86 @@ export default function CuentaView() {
           ) : cvs.length === 0 ? (
             <div className="rounded-xl border border-dashed border-line p-5 text-center text-sm text-muted">
               Aún no has guardado ningún CV. Sube uno en{" "}
-              <a href="/jano-web/app/" className="text-accent-deep hover:underline">
+              <Link href="/app/" className="text-accent-deep hover:underline">
                 Adaptar CV
-              </a>
+              </Link>
               .
             </div>
           ) : (
             <ul className="space-y-2">
-              {cvs.map((cv) => (
-                <li
-                  key={cv.id}
-                  className="flex items-center justify-between rounded-xl border border-line bg-paper px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm font-semibold">{cv.nombre}</p>
-                    <p className="text-[11px] text-muted">Guardado el {cv.created_at.slice(0, 10)}</p>
-                  </div>
-                  <button
-                    onClick={() => borrarCv(cv.id)}
-                    className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-muted-2 transition hover:border-danger/40 hover:text-danger"
+              {cvs.map((cv) => {
+                const activo = cv.cv_id === activoCvId;
+                const editando = renombrando === cv.id;
+                return (
+                  <li
+                    key={cv.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-paper px-4 py-3"
                   >
-                    Eliminar
-                  </button>
-                </li>
-              ))}
+                    <div className="min-w-0">
+                      {editando ? (
+                        <input
+                          autoFocus
+                          value={nuevoNombre}
+                          onChange={(e) => setNuevoNombre(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") confirmarRenombre(cv.id);
+                            if (e.key === "Escape") setRenombrando(null);
+                          }}
+                          onBlur={() => confirmarRenombre(cv.id)}
+                          className="rounded-lg border border-accent/40 bg-surface px-2 py-1 text-sm outline-none"
+                        />
+                      ) : (
+                        <p className="flex items-center gap-2 text-sm font-semibold">
+                          <span className="truncate">{cv.nombre}</span>
+                          {activo && <Pill tone="ok">En uso</Pill>}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-muted">Guardado el {cv.created_at.slice(0, 10)}</p>
+                    </div>
+                    <div className="flex shrink-0 gap-1.5">
+                      {cv.archivo_path && (
+                        <button
+                          onClick={() =>
+                            descargarOriginal(cv).catch((e) =>
+                              toast(e instanceof Error ? e.message : "No pude descargarlo.", "error")
+                            )
+                          }
+                          className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-muted-2 transition hover:border-accent/40 hover:text-accent-deep"
+                        >
+                          Original
+                        </button>
+                      )}
+                      {!activo && (
+                        <button
+                          onClick={() => {
+                            setActiveCvId(cv.cv_id);
+                            setActivoCvId(cv.cv_id);
+                            toast(`"${cv.nombre}" es ahora tu CV en uso.`, "ok");
+                          }}
+                          className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-muted-2 transition hover:border-accent/40 hover:text-accent-deep"
+                        >
+                          Usar
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setRenombrando(cv.id);
+                          setNuevoNombre(cv.nombre);
+                        }}
+                        className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-muted-2 transition hover:border-accent/40 hover:text-ink"
+                      >
+                        Renombrar
+                      </button>
+                      <button
+                        onClick={() => borrarCv(cv.id)}
+                        className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-muted-2 transition hover:border-danger/40 hover:text-danger"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
           <Pill tone="neutral">Cada CV guarda su propia base de hechos</Pill>
