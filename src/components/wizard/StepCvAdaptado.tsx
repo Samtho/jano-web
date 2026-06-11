@@ -54,6 +54,7 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
   useEffect(() => {
     if (ofertaMeta.empresa) setEmpresa((v) => v || ofertaMeta.empresa);
     if (ofertaMeta.titulo) setPuesto((v) => v || ofertaMeta.titulo);
+    if (ofertaMeta.sector) setSector((v) => v || ofertaMeta.sector!);
   }, [ofertaMeta]);
   // Telefono/ciudad/linkedin del perfil para la cabecera del CV.
   useEffect(() => {

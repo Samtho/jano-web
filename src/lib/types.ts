@@ -12,6 +12,10 @@ export interface MatchResult {
   porCategoria: Record<string, CategoriaDetalle>;
   cubre: string[];
   noCubre: string[];
+  // Meta de la oferta, extraida por el motor (para prefiltrar el registro en el tracker).
+  empresa?: string;
+  puesto?: string;
+  sector?: string;
 }
 
 // ===== CV Harvard (lo que devuelve mono-cv-adaptado) =====

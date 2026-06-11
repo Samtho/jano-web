@@ -5,7 +5,7 @@ import Button from "@/components/ui/Button";
 import CountUp from "@/components/ui/CountUp";
 import Pill from "@/components/ui/Pill";
 import { useToast } from "@/components/ui/Toast";
-import { getPostulaciones, updatePostulacion } from "@/lib/api";
+import { deletePostulacion, getPostulaciones, updatePostulacion } from "@/lib/api";
 import { listMyCvs } from "@/lib/cvs";
 import { getCvId } from "@/lib/session";
 import type { Postulacion } from "@/lib/types";
@@ -105,6 +105,7 @@ export default function TrackerView() {
   const toast = useToast();
   const [rows, setRows] = useState<Postulacion[] | null>(null);
   const [cvIds, setCvIds] = useState<string[]>([]);
+  const [filtro, setFiltro] = useState<string>("todas");
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -136,12 +137,28 @@ export default function TrackerView() {
     }
   }
 
+  async function borrar(id: string) {
+    const previas = rows;
+    setRows((prev) => prev?.filter((r) => r.id !== id) ?? null);
+    try {
+      await deletePostulacion({ id, cvIds });
+      toast("Postulación eliminada.", "ok");
+    } catch {
+      setRows(previas ?? null);
+      toast("No pude eliminarla. Reintenta.", "error");
+    }
+  }
+
+  // KPIs siempre sobre el total; la tabla respeta el filtro por estado.
   const total = rows?.length ?? 0;
-  const conRespuesta = rows?.filter((r) => r.estado !== "enviada" && r.estado !== "sin_respuesta").length ?? 0;
-  const entrevistas = rows?.filter((r) => r.estado === "entrevista").length ?? 0;
+  // Hubo comunicacion si el estado paso de "enviada"/"sin respuesta" a cualquier otro.
+  const norm = (e: string) => String(e).replace("-", "_");
+  const conRespuesta = rows?.filter((r) => ["entrevista", "oferta", "rechazo"].includes(norm(r.estado))).length ?? 0;
+  const entrevistas = rows?.filter((r) => norm(r.estado) === "entrevista").length ?? 0;
   const matchMedio = rows && rows.length
     ? Math.round(rows.reduce((acc, r) => acc + (r.match_score ?? 0), 0) / rows.length)
     : 0;
+  const filas = rows?.filter((r) => filtro === "todas" || String(r.estado).replace("-", "_") === filtro) ?? null;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-10">
@@ -178,6 +195,33 @@ export default function TrackerView() {
           <h2 className="font-display text-lg font-semibold">Todas las postulaciones</h2>
           <Pill tone="accent">Edición en línea · guarda al instante</Pill>
         </div>
+
+        {/* Filtros por estado */}
+        {rows !== null && rows.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 border-b border-line px-5 py-3">
+            {[
+              { v: "todas", l: "Todas" },
+              ...ESTADOS.map((e) => ({ v: e.value, l: e.label })),
+            ].map((f) => (
+              <button
+                key={f.v}
+                onClick={() => setFiltro(f.v)}
+                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                  filtro === f.v
+                    ? "border-accent/40 bg-tint text-accent-deep"
+                    : "border-line text-muted-2 hover:border-accent/30 hover:text-ink"
+                }`}
+              >
+                {f.l}
+                {f.v !== "todas" && (
+                  <span className="ml-1 opacity-60">
+                    {rows.filter((r) => String(r.estado).replace("-", "_") === f.v).length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {error && (
           <div className="px-5 py-14 text-center text-sm text-muted">

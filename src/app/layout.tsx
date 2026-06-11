@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${fraunces.variable} ${inter.variable}`}>
+    <html lang="es" className={`${fraunces.variable} ${inter.variable}`} suppressHydrationWarning>
       <body className="min-h-screen flex flex-col">
         <ToastProvider>
           <AuthProvider>

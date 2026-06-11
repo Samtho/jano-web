@@ -92,6 +92,10 @@ export function updatePostulacion(p: {
   return post<{ ok: boolean }>("/mono-postulaciones-update", { ...resto, cvIds: cvIds.join(",") });
 }
 
+export function deletePostulacion(p: { id: string; cvIds: string[] }) {
+  return post<{ ok: boolean }>("/mono-postulaciones-borrar", { id: p.id, cvIds: p.cvIds.join(",") });
+}
+
 export function addPostulacion(p: {
   empresa: string;
   puesto: string;

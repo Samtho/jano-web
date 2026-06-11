@@ -18,7 +18,10 @@ type Props = {
 
 export default function StepMatch({ match, prevScore, onCerrarHuecos, onGenerarCv, onVolver }: Props) {
   const delta = prevScore !== null ? match.matchScore - prevScore : null;
-  const huecos = match.noCubre.length;
+  // Defensa: una respuesta parcial del match (sin cubre/noCubre) no debe tumbar la pagina.
+  const cubre = match.cubre ?? [];
+  const noCubre = match.noCubre ?? [];
+  const huecos = noCubre.length;
   // Celebracion: score fuerte o subida tras cerrar huecos.
   const [celebrar, setCelebrar] = useState(match.matchScore >= 70 || (delta !== null && delta > 0));
 
@@ -44,16 +47,16 @@ export default function StepMatch({ match, prevScore, onCerrarHuecos, onGenerarC
             </span>
           )}
           <div className="w-full border-t border-line pt-4">
-            <CategoryBars porCategoria={match.porCategoria} />
+            <CategoryBars porCategoria={match.porCategoria ?? {}} />
           </div>
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2">
           <div className="rounded-2xl border border-line bg-surface p-6 shadow-card">
-            <Pill tone="ok">Cubre · {match.cubre.length}</Pill>
+            <Pill tone="ok">Cubre · {cubre.length}</Pill>
             <ul className="mt-4 space-y-2.5">
-              {match.cubre.length ? (
-                match.cubre.map((r, i) => (
+              {cubre.length ? (
+                cubre.map((r, i) => (
                   <li key={r} className="fade-up flex gap-2 text-sm leading-snug" style={{ "--i": i } as React.CSSProperties}>
                     <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-ok" />
                     {r}
@@ -68,7 +71,7 @@ export default function StepMatch({ match, prevScore, onCerrarHuecos, onGenerarC
             <Pill tone="danger">No cubre · {huecos}</Pill>
             <ul className="mt-4 space-y-2.5">
               {huecos ? (
-                match.noCubre.map((r, i) => (
+                noCubre.map((r, i) => (
                   <li key={r} className="fade-up flex gap-2 text-sm leading-snug" style={{ "--i": i } as React.CSSProperties}>
                     <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full border-2 border-danger" />
                     {r}

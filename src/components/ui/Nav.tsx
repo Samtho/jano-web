@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 
 const APP_LINKS = [
   { href: "/app/", label: "Adaptar CV" },
@@ -67,6 +68,9 @@ export default function Nav() {
               </Link>
             );
           })}
+          <div className="ml-1">
+            <ThemeToggle />
+          </div>
           {user ? (
             <div className="ml-2 flex items-center gap-2">
               <Link

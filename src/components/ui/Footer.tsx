@@ -9,9 +9,7 @@ export default function Footer() {
           <span className="font-medium text-ink">Jano 2.1</span>
           <span>· Atrás y adelante</span>
         </div>
-        <p>
-          TFM · Business Analytics &amp; AI · 2026 · Nada de lo que ves se inventa: cada bullet tiene origen.
-        </p>
+        <p>Nada de lo que ves se inventa: cada bullet tiene origen.</p>
       </div>
     </footer>
   );

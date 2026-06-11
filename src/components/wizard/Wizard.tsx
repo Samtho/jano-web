@@ -15,7 +15,7 @@ import StepCvAdaptado from "./StepCvAdaptado";
 
 const STEPS = ["Tu CV", "La oferta", "El match", "Huecos", "CV adaptado"];
 
-export type OfertaMeta = { titulo: string; empresa: string };
+export type OfertaMeta = { titulo: string; empresa: string; sector?: string };
 
 export default function Wizard() {
   const toast = useToast();
@@ -141,6 +141,12 @@ export default function Wizard() {
       const r = await api.matchOferta(getCvId(), ofertaTexto.trim());
       setPrevScore(desdeHuecos ? scoreAnterior : null);
       setMatch(r);
+      // Prefill del registro: la empresa/puesto/sector que el motor saca de la oferta pegada.
+      setOfertaMeta((m) => ({
+        titulo: r.puesto || m.titulo,
+        empresa: r.empresa || m.empresa,
+        sector: r.sector || m.sector,
+      }));
       setOfertaDelMatch(ofertaTexto.trim());
       prefetchAdaptado(ofertaTexto.trim());
       if (desdeHuecos && scoreAnterior !== null) {
@@ -215,7 +221,7 @@ export default function Wizard() {
         )}
         {step === 4 && match && (
           <StepHuecos
-            noCubre={match.noCubre}
+            noCubre={match.noCubre ?? []}
             respondidos={respondidos}
             busy={matchBusy}
             onResponder={responderHueco}
