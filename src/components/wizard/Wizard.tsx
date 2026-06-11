@@ -218,6 +218,7 @@ export default function Wizard() {
             ofertaTexto={ofertaTexto}
             ofertaMeta={ofertaMeta}
             onVolver={() => go(3)}
+            onReintentar={generarAdaptado}
           />
         )}
       </div>

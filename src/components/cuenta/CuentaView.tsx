@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { deleteMyCv, listMyCvs, type SavedCv } from "@/lib/cvs";
+import { getMyProfile, updateMyProfile } from "@/lib/profile";
 
 function Card({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
@@ -26,6 +27,9 @@ export default function CuentaView() {
 
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [ciudad, setCiudad] = useState("");
+  const [linkedin, setLinkedin] = useState("");
   const [password, setPassword] = useState("");
   const [savingPerfil, setSavingPerfil] = useState(false);
   const [savingPass, setSavingPass] = useState(false);
@@ -36,6 +40,12 @@ export default function CuentaView() {
     if (!user) return;
     setNombre((user.user_metadata?.nombre as string) ?? "");
     setEmail(user.email ?? "");
+    getMyProfile().then((p) => {
+      if (!p) return;
+      setTelefono(p.telefono ?? "");
+      setCiudad(p.ciudad ?? "");
+      setLinkedin(p.linkedin ?? "");
+    });
     listMyCvs()
       .then(setCvs)
       .catch(() => setCvs([]));
@@ -49,13 +59,18 @@ export default function CuentaView() {
       const emailCambia = email && email !== user?.email;
       if (emailCambia) cambios.email = email;
 
-      const { error } = await supabase.auth.updateUser(cambios);
-      if (error) throw new Error(error.message);
-
-      // El nombre tambien en la tabla profiles (best effort).
-      if (cambios.data && user) {
-        await supabase.from("profiles").update({ nombre }).eq("id", user.id);
+      if (cambios.data || cambios.email) {
+        const { error } = await supabase.auth.updateUser(cambios);
+        if (error) throw new Error(error.message);
       }
+
+      // Perfil extendido: estos datos van a la cabecera del CV descargado.
+      await updateMyProfile({
+        nombre: nombre || null,
+        telefono: telefono || null,
+        ciudad: ciudad || null,
+        linkedin: linkedin || null,
+      });
       if (emailCambia) {
         toast("Te enviamos un email para confirmar el cambio de correo.", "info");
       } else {
@@ -124,6 +139,27 @@ export default function CuentaView() {
             <input id="c-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
             <p className="mt-1 text-[11px] text-muted">Cambiar el email requiere confirmarlo por correo.</p>
           </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted-2" htmlFor="c-tel">
+                Teléfono
+              </label>
+              <input id="c-tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} className={inputCls} placeholder="+34 600 000 000" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted-2" htmlFor="c-ciudad">
+                Ciudad
+              </label>
+              <input id="c-ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} className={inputCls} placeholder="Madrid, España" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted-2" htmlFor="c-linkedin">
+                LinkedIn
+              </label>
+              <input id="c-linkedin" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} className={inputCls} placeholder="linkedin.com/in/usuario" />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted">Estos datos forman la cabecera de tu CV descargado.</p>
           <Button onClick={guardarPerfil} disabled={savingPerfil}>
             {savingPerfil ? "Guardando…" : "Guardar cambios"}
           </Button>

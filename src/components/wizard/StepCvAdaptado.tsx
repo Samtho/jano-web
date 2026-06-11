@@ -7,8 +7,10 @@ import ProcessLoader from "@/components/ui/ProcessLoader";
 import { useToast } from "@/components/ui/Toast";
 import { addPostulacion, mejorarBullet } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { getMyProfile } from "@/lib/profile";
 import { getCvId } from "@/lib/session";
 import type { BulletCv, ContactoCv, CvAdaptado } from "@/lib/types";
+import PdfPreview, { type AuditSel } from "./PdfPreview";
 import type { OfertaMeta } from "./Wizard";
 
 type Props = {
@@ -18,6 +20,7 @@ type Props = {
   ofertaTexto: string;
   ofertaMeta: OfertaMeta;
   onVolver: () => void;
+  onReintentar: () => void;
 };
 
 const STAGES_CV = [
@@ -27,17 +30,13 @@ const STAGES_CV = [
   "Citando el origen de cada línea",
 ];
 
-// Orden Harvard: perfil (aparte), habilidades, experiencia, educacion, certs.
-const ORDEN: Record<string, number> = { habilidades: 1, experiencia: 2, educacion: 3, certificaciones: 4, otros: 5 };
-
-type Sel = { si: number; bi: number; bu: number } | { perfil: true } | null;
-
-export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto, ofertaMeta, onVolver }: Props) {
+export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto, ofertaMeta, onVolver, onReintentar }: Props) {
   const toast = useToast();
   const { user } = useAuth();
 
   const [cv, setCv] = useState<CvAdaptado | null>(adaptado);
-  const [sel, setSel] = useState<Sel>(null);
+  const [sel, setSel] = useState<AuditSel | null>(null);
+  const [perfilExtra, setPerfilExtra] = useState<{ telefono?: string; ciudad?: string; linkedin?: string }>({});
   const [alternativas, setAlternativas] = useState<string[] | null>(null);
   const [mejorando, setMejorando] = useState(false);
   const [descargando, setDescargando] = useState(false);
@@ -56,10 +55,22 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
     if (ofertaMeta.empresa) setEmpresa((v) => v || ofertaMeta.empresa);
     if (ofertaMeta.titulo) setPuesto((v) => v || ofertaMeta.titulo);
   }, [ofertaMeta]);
+  // Telefono/ciudad/linkedin del perfil para la cabecera del CV.
+  useEffect(() => {
+    getMyProfile().then((p) => {
+      if (p)
+        setPerfilExtra({
+          telefono: p.telefono ?? undefined,
+          ciudad: p.ciudad ?? undefined,
+          linkedin: p.linkedin ?? undefined,
+        });
+    });
+  }, []);
 
   const contacto: ContactoCv = {
     nombre: (user?.user_metadata?.nombre as string) || user?.email?.split("@")[0] || "Tu nombre",
     email: user?.email ?? undefined,
+    ...perfilExtra,
   };
 
   const bulletSel: BulletCv | null =
@@ -69,11 +80,6 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
       ? cv?.perfil_origen ?? []
       : bulletSel?.origen ?? []
     : [];
-
-  function seleccionarBullet(si: number, bi: number, bu: number) {
-    setSel({ si, bi, bu });
-    setAlternativas(null);
-  }
 
   async function pedirAlternativas() {
     if (!bulletSel) return;
@@ -150,7 +156,7 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
     }
   }
 
-  if (busy || !cv) {
+  if (busy) {
     return (
       <div className="py-10">
         <h1 className="mb-2 text-center font-display text-3xl font-semibold tracking-tight">
@@ -162,8 +168,25 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
     );
   }
 
-  const secciones = [...cv.secciones].sort((a, b) => (ORDEN[a.tipo] ?? 9) - (ORDEN[b.tipo] ?? 9));
-  const lineaContacto = [contacto.email].filter(Boolean).join("  ●  ");
+  // Fallo en la generacion: estado de error con reintento (nunca loader infinito).
+  if (!cv) {
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <h1 className="font-display text-2xl font-semibold">No pude generar el CV</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-2">
+          Algo falló al redactarlo. Suele resolverse reintentando.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <Button variant="ghost" onClick={onVolver}>
+            ← Volver al match
+          </Button>
+          <Button onClick={onReintentar} arrow>
+            Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -187,71 +210,16 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        {/* Hoja Harvard (clon de la plantilla, compacta como el PDF) */}
-        <div className="cv-paper rounded-xl px-9 py-8 text-[10.5px] leading-[1.3] text-[#111]">
-          <p className="text-center text-[19px] font-bold leading-tight">{contacto.nombre}</p>
-          {lineaContacto && <p className="mt-0.5 text-center text-[10px] text-[#333]">{lineaContacto}</p>}
-          <div className="mb-2.5 mt-2 border-b-[1.5px] border-black" />
-
-          {/* Perfil (clicable) */}
-          <button
-            onClick={() => {
-              setSel({ perfil: true });
-              setAlternativas(null);
-            }}
-            className={`block w-full rounded px-1 text-justify text-[10.5px] leading-[1.35] ${
-              sel && "perfil" in sel ? "sel" : ""
-            }`}
-          >
-            {cv.perfil}
-          </button>
-
-          {secciones.map((sec, siOriginal) => {
-            const si = cv.secciones.indexOf(sec);
-            return (
-              <section key={`${sec.tipo}-${siOriginal}`} className="mt-3">
-                <p className="text-center text-[10.5px] font-bold uppercase tracking-wide">{sec.titulo}</p>
-
-                {sec.grupos?.map((g) => (
-                  <div key={g.categoria} className="mt-1.5 text-center">
-                    <p className="text-[10.5px] font-bold">{g.categoria}</p>
-                    <p className="text-[10.5px]">{g.items.join(", ")}</p>
-                  </div>
-                ))}
-
-                {sec.bloques?.map((b, bi) => (
-                  <div key={bi} className="mt-2.5">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-[10.5px] uppercase">{b.empresa}</p>
-                      <p className="text-[10.5px]">{b.ubicacion}</p>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-[10.5px] font-bold">{b.puesto}</p>
-                      <p className="text-[10.5px]">{b.fechas}</p>
-                    </div>
-                    {b.bullets && b.bullets.length > 0 && (
-                      <ul className="mt-1 list-disc space-y-[3px] pl-5">
-                        {b.bullets.map((bu, bui) => {
-                          const activo = sel && "si" in sel && sel.si === si && sel.bi === bi && sel.bu === bui;
-                          return (
-                            <li key={bui}>
-                              <button
-                                onClick={() => seleccionarBullet(si, bi, bui)}
-                                className={`w-full rounded px-1 text-left text-[10.5px] leading-snug ${activo ? "sel" : ""}`}
-                              >
-                                {bu.texto}
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                ))}
-              </section>
-            );
-          })}
-        </div>
+        {/* La preview ES el PDF real (mismo blob que la descarga). */}
+        <PdfPreview
+          cv={cv}
+          contacto={contacto}
+          selActiva={sel}
+          onAudit={(s) => {
+            setSel(s);
+            setAlternativas(null);
+          }}
+        />
 
         {/* Panel: auditar + mejorar + tracker */}
         <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
