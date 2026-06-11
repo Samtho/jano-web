@@ -6,6 +6,8 @@ import CountUp from "@/components/ui/CountUp";
 import Pill from "@/components/ui/Pill";
 import { useToast } from "@/components/ui/Toast";
 import { getPostulaciones, updatePostulacion } from "@/lib/api";
+import { listMyCvs } from "@/lib/cvs";
+import { getCvId } from "@/lib/session";
 import type { Postulacion } from "@/lib/types";
 
 const ESTADOS = [
@@ -102,12 +104,23 @@ function Kpi({ label, value, suffix = "", hint, index }: { label: string; value:
 export default function TrackerView() {
   const toast = useToast();
   const [rows, setRows] = useState<Postulacion[] | null>(null);
+  const [cvIds, setCvIds] = useState<string[]>([]);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    getPostulaciones()
-      .then(setRows)
-      .catch(() => setError(true));
+    // El tracker es personal: solo las postulaciones de TUS CVs
+    // (los guardados en tu cuenta + el activo en este navegador).
+    (async () => {
+      try {
+        const mios = await listMyCvs().catch(() => []);
+        const ids = Array.from(new Set([...mios.map((c) => c.cv_id), getCvId()]));
+        setCvIds(ids);
+        const data = await getPostulaciones(ids);
+        setRows(data);
+      } catch {
+        setError(true);
+      }
+    })();
   }, []);
 
   // Edicion optimista: la UI cambia ya; si el guardado falla, se revierte.
@@ -115,7 +128,7 @@ export default function TrackerView() {
     const previas = rows;
     setRows((prev) => prev?.map((r) => (r.id === id ? { ...r, ...campos } : r)) ?? null);
     try {
-      await updatePostulacion({ id, ...campos });
+      await updatePostulacion({ id, cvIds, ...campos });
       toast("Guardado", "ok");
     } catch {
       setRows(previas ?? null);

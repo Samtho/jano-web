@@ -71,15 +71,25 @@ export function mejorarBullet(texto: string, origen: string, ofertaTexto: string
   });
 }
 
-export async function getPostulaciones(): Promise<Postulacion[]> {
-  const res = await fetch(`${BASE}${PATHS.postulaciones}`);
+// El tracker es personal: se pide con la lista de cvIds del usuario.
+export async function getPostulaciones(cvIds: string[]): Promise<Postulacion[]> {
+  if (!cvIds.length) return [];
+  const res = await fetch(`${BASE}${PATHS.postulaciones}?cvIds=${encodeURIComponent(cvIds.join(","))}`);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  // El motor emite [{}] cuando no hay filas: filtrar objetos sin id.
+  return Array.isArray(data) ? data.filter((r) => r && r.id) : [];
 }
 
-export function updatePostulacion(p: { id: string; estado?: string; sector?: string; salario?: string }) {
-  return post<{ ok: boolean }>("/mono-postulaciones-update", p);
+export function updatePostulacion(p: {
+  id: string;
+  cvIds: string[];
+  estado?: string;
+  sector?: string;
+  salario?: string;
+}) {
+  const { cvIds, ...resto } = p;
+  return post<{ ok: boolean }>("/mono-postulaciones-update", { ...resto, cvIds: cvIds.join(",") });
 }
 
 export function addPostulacion(p: {

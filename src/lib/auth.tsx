@@ -62,6 +62,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     await supabase.auth.signOut();
+    // Limpiar el estado local: que el siguiente usuario de este navegador
+    // no herede el cvId, la oferta ni el CV del anterior.
+    try {
+      for (const k of Object.keys(localStorage)) {
+        if (k.startsWith("jano.")) localStorage.removeItem(k);
+      }
+    } catch {
+      // localStorage no disponible: nada que limpiar
+    }
   }
 
   return (

@@ -74,7 +74,7 @@ export default function Landing() {
             </Button>
           </div>
           <p className="fade-up mt-4 text-xs text-muted" style={{ "--i": 4 } as React.CSSProperties}>
-            Menos de 1 minuto · sin registro · tu archivo no sale de tu navegador
+            Menos de 1 minuto · cuenta gratis · tu archivo no sale de tu navegador
           </p>
         </div>
       </Spotlight>

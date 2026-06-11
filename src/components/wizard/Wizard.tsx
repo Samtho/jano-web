@@ -93,6 +93,10 @@ export default function Wizard() {
       resetDesdeCv();
       listMyCvs().then(setSavedCvs).catch(() => {});
       toast(`"${nombreCv.trim()}" guardado: ${r.guardados} hechos con origen`, "ok");
+      // Red de seguridad: documento largo con pocos hechos = extraccion floja.
+      if (cvTexto.length > 6000 && r.guardados < 12) {
+        toast("Salieron pocos hechos para un documento tan largo. Considera re-subirlo.", "info");
+      }
       setNombreCv("");
       setCvTexto("");
       go(2);
