@@ -140,7 +140,9 @@ export default function Wizard() {
     const scoreAnterior = match?.matchScore ?? null;
     try {
       saveOferta(ofertaTexto.trim());
-      const r = await api.matchOferta(getCvId(), ofertaTexto.trim());
+      // Desde huecos se reusa la lista de requisitos del match vigente: el delta
+      // del score refleja solo las respuestas nuevas y los huecos no cambian de texto.
+      const r = await api.matchOferta(getCvId(), ofertaTexto.trim(), desdeHuecos ? match : null);
       setPrevScore(desdeHuecos ? scoreAnterior : null);
       setMatch(r);
       // Prefill del registro: la empresa/puesto/sector que el motor saca de la oferta pegada.

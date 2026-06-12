@@ -1,4 +1,4 @@
-import type { CvAdaptado, MatchResult, Postulacion } from "@/lib/types";
+import type { CvAdaptado, MatchResult, Postulacion, RequisitoOferta } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 
 // Unico punto de contacto con el motor n8n. Apuntado al workflow UNICO
@@ -56,8 +56,17 @@ export function ingestCv(cvId: string, textoCV: string) {
   return post<{ ok: boolean; guardados: number }>(PATHS.ingestCv, { cvId, textoCV });
 }
 
-export function matchOferta(cvId: string, ofertaTexto: string) {
-  return post<MatchResult>(PATHS.matchOferta, { cvId, oferta_texto: ofertaTexto });
+// Si se pasa el match previo (recalculo desde huecos), se reenvian sus requisitos:
+// el motor se salta la re-extraccion y la lista de huecos queda estable y comparable.
+export function matchOferta(cvId: string, ofertaTexto: string, previo?: MatchResult | null) {
+  const requisitos: RequisitoOferta[] = previo?.requisitos ?? [];
+  return post<MatchResult>(PATHS.matchOferta, {
+    cvId,
+    oferta_texto: ofertaTexto,
+    ...(requisitos.length
+      ? { requisitos, empresa: previo?.empresa ?? "", puesto: previo?.puesto ?? "", sector: previo?.sector ?? "" }
+      : {}),
+  });
 }
 
 export function guardarHueco(cvId: string, requisito: string, respuesta: string) {

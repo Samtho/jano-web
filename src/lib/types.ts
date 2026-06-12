@@ -7,8 +7,16 @@ export interface CategoriaDetalle {
   peso: number;
 }
 
+// Requisito extraido de la oferta; el frontend lo reenvia al recalcular
+// para que la lista no cambie entre recalculos.
+export interface RequisitoOferta {
+  texto: string;
+  categoria: string;
+}
+
 export interface MatchResult {
   matchScore: number;
+  requisitos?: RequisitoOferta[];
   porCategoria: Record<string, CategoriaDetalle>;
   cubre: string[];
   noCubre: string[];
