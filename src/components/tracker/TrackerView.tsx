@@ -6,8 +6,6 @@ import CountUp from "@/components/ui/CountUp";
 import Pill from "@/components/ui/Pill";
 import { useToast } from "@/components/ui/Toast";
 import { deletePostulacion, getPostulaciones, updatePostulacion } from "@/lib/api";
-import { listMyCvs } from "@/lib/cvs";
-import { getCvId } from "@/lib/session";
 import type { Postulacion } from "@/lib/types";
 
 const ESTADOS = [
@@ -104,19 +102,15 @@ function Kpi({ label, value, suffix = "", hint, index }: { label: string; value:
 export default function TrackerView() {
   const toast = useToast();
   const [rows, setRows] = useState<Postulacion[] | null>(null);
-  const [cvIds, setCvIds] = useState<string[]>([]);
   const [filtro, setFiltro] = useState<string>("todas");
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    // El tracker es personal: solo las postulaciones de TUS CVs
-    // (los guardados en tu cuenta + el activo en este navegador).
+    // El tracker es personal: n8n deriva los CVs del usuario desde su token
+    // de sesion (user_cvs via RLS), aqui no hay que pasarle nada.
     (async () => {
       try {
-        const mios = await listMyCvs().catch(() => []);
-        const ids = Array.from(new Set([...mios.map((c) => c.cv_id), getCvId()]));
-        setCvIds(ids);
-        const data = await getPostulaciones(ids);
+        const data = await getPostulaciones();
         setRows(data);
       } catch {
         setError(true);
@@ -129,7 +123,7 @@ export default function TrackerView() {
     const previas = rows;
     setRows((prev) => prev?.map((r) => (r.id === id ? { ...r, ...campos } : r)) ?? null);
     try {
-      await updatePostulacion({ id, cvIds, ...campos });
+      await updatePostulacion({ id, ...campos });
       toast("Guardado", "ok");
     } catch {
       setRows(previas ?? null);
@@ -141,7 +135,7 @@ export default function TrackerView() {
     const previas = rows;
     setRows((prev) => prev?.filter((r) => r.id !== id) ?? null);
     try {
-      await deletePostulacion({ id, cvIds });
+      await deletePostulacion({ id });
       toast("Postulación eliminada.", "ok");
     } catch {
       setRows(previas ?? null);

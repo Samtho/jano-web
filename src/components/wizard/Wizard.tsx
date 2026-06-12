@@ -98,8 +98,10 @@ export default function Wizard() {
     setCvBusy(true);
     try {
       const cvId = newCvId();
-      const r = await api.ingestCv(cvId, cvTexto.trim());
+      // Primero se registra el CV en la cuenta: el gate de auth de n8n solo
+      // acepta ingestar cvIds que ya pertenezcan al usuario (user_cvs).
       await saveMyCv(cvId, nombreCv.trim(), archivoCv);
+      const r = await api.ingestCv(cvId, cvTexto.trim());
       setArchivoCv(null);
       resetDesdeCv();
       listMyCvs().then(setSavedCvs).catch(() => {});

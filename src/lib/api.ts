@@ -1,4 +1,5 @@
 import type { CvAdaptado, MatchResult, Postulacion } from "@/lib/types";
+import { supabase } from "@/lib/supabase";
 
 // Unico punto de contacto con el motor n8n. Apuntado al workflow UNICO
 // "Jano - Todo en uno" (paths mono-*). Para volver a los flujos separados v2,
@@ -16,12 +17,20 @@ const PATHS = {
   postulacionesAlta: "/mono-postulaciones-alta",
 } as const;
 
+// Toda llamada al motor viaja con el token de sesion de Supabase: n8n lo
+// valida contra Supabase Auth y comprueba que el cvId pertenece al usuario.
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // POST con un reintento automatico ante fallo de red o 5xx (a prueba de demo).
 async function post<T>(path: string, body: unknown, intento = 1): Promise<T> {
   try {
     const res = await fetch(`${BASE}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(body),
     });
     if (res.status >= 500 && intento === 1) {
@@ -71,10 +80,10 @@ export function mejorarBullet(texto: string, origen: string, ofertaTexto: string
   });
 }
 
-// El tracker es personal: se pide con la lista de cvIds del usuario.
-export async function getPostulaciones(cvIds: string[]): Promise<Postulacion[]> {
-  if (!cvIds.length) return [];
-  const res = await fetch(`${BASE}${PATHS.postulaciones}?cvIds=${encodeURIComponent(cvIds.join(","))}`);
+// El tracker es personal: n8n deriva los CVs del usuario desde su token
+// (tabla user_cvs via RLS), el cliente ya no manda cvIds.
+export async function getPostulaciones(): Promise<Postulacion[]> {
+  const res = await fetch(`${BASE}${PATHS.postulaciones}`, { headers: await authHeaders() });
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
   // El motor emite [{}] cuando no hay filas: filtrar objetos sin id.
@@ -83,17 +92,15 @@ export async function getPostulaciones(cvIds: string[]): Promise<Postulacion[]> 
 
 export function updatePostulacion(p: {
   id: string;
-  cvIds: string[];
   estado?: string;
   sector?: string;
   salario?: string;
 }) {
-  const { cvIds, ...resto } = p;
-  return post<{ ok: boolean }>("/mono-postulaciones-update", { ...resto, cvIds: cvIds.join(",") });
+  return post<{ ok: boolean }>("/mono-postulaciones-update", p);
 }
 
-export function deletePostulacion(p: { id: string; cvIds: string[] }) {
-  return post<{ ok: boolean }>("/mono-postulaciones-borrar", { id: p.id, cvIds: p.cvIds.join(",") });
+export function deletePostulacion(p: { id: string }) {
+  return post<{ ok: boolean }>("/mono-postulaciones-borrar", p);
 }
 
 export function addPostulacion(p: {
