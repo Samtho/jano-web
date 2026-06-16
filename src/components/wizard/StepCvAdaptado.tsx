@@ -147,6 +147,7 @@ export default function StepCvAdaptado({ adaptado, busy, matchScore, ofertaTexto
         match_score: matchScore,
         salario: salario.trim(),
         cv_id: getCvId(),
+        oferta_texto: ofertaTexto,
       });
       setTrackerOk(true);
       toast("Postulación registrada en tu tracker.", "ok");

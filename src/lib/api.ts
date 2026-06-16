@@ -120,6 +120,7 @@ export function addPostulacion(p: {
   salario: string;
   cv_id: string;
   url_oferta?: string;
+  oferta_texto?: string;
 }) {
   return post<{ ok: boolean; id: string }>(PATHS.postulacionesAlta, p);
 }
