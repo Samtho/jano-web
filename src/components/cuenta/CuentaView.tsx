@@ -188,6 +188,24 @@ export default function CuentaView() {
           </Button>
         </Card>
 
+        {/* Telegram */}
+        <Card titulo="Telegram">
+          <p className="text-sm text-muted-2">
+            Vincula tu cuenta con el bot de Telegram para usar Jano desde el chat con tu mismo CV y tus ofertas.
+          </p>
+          <a
+            href={user ? `https://t.me/Jano_buddy_n8n_bot?start=${user.id}` : "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-deep"
+          >
+            Vincular Telegram →
+          </a>
+          <p className="text-[11px] text-muted">
+            Se abrirá el chat del bot con un código ligado a tu cuenta. Pulsa Enviar/Start y quedará vinculado.
+          </p>
+        </Card>
+
         {/* Seguridad */}
         <Card titulo="Seguridad">
           <div>
