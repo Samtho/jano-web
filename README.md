@@ -64,7 +64,7 @@ El deploy es automático: cada push a `main` publica en GitHub Pages.
 
 ## Límites conocidos 
 
-- Sin OCR: un PDF escaneado pide pegar el texto a mano.
+- Un PDF escaneado o pegar el texto a mano.
 - Si ni el fetch directo ni el proxy de lectura pueden leer una URL, se pega el texto a mano.
 - Identidad por navegador.
 - La exportación .docx ATS pertenece a la capa C del equipo; aquí hay imprimir / PDF.
