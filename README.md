@@ -62,13 +62,10 @@ El deploy es automático: cada push a `main` publica en GitHub Pages.
 - **Cargas narradas** por etapas reales, confetti al lograr o subir el score, transiciones entre pasos, landing con aurora y demo de producto.
 - Reintento automático ante fallos de red en todas las llamadas.
 
-## Límites conocidos (v2.1)
+## Límites conocidos 
 
 - Sin OCR: un PDF escaneado pide pegar el texto a mano.
 - Si ni el fetch directo ni el proxy de lectura pueden leer una URL, se pega el texto a mano.
-- Identidad por navegador, sin login.
+- Identidad por navegador.
 - La exportación .docx ATS pertenece a la capa C del equipo; aquí hay imprimir / PDF.
 
----
-
-TFM · Master in Business Analytics & AI · Inesdi · 2026. Proyecto en equipo de 3 capas: A (motor IA + guardarraíl), **B (agente RAG: este repo + flujos n8n)**, C (automatización + tracker + avisos).
